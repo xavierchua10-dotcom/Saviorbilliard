@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0014">
+<title>8-Ball Pool — Savior Cue Club</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #05010f;
+    --deep: #0d0122;
+    --panel-a: rgba(16,4,38,.92);
+    --panel-b: rgba(28,6,58,.92);
+    --pink: #ff2fd8;
+    --purple: #8b2fff;
+    --cyan: #23e8ff;
+    --lavender: #b9a3e8;
+    --text-main: #f2ecff;
+    --text-muted: #a996d1;
+    --felt-a: #0f5a3f;
+    --felt-b: #073b28;
+    --cushion: #2a150c;
+    --wood: #4a2810;
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--void);
+    color: var(--text-main);
+    font-family: 'Rajdhani', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    overflow-x: hidden;
+  }
+
+  /* Background ambiance */
+  .bg-night {
+    position: fixed; inset: 0; z-index: -9;
+    background: linear-gradient(to bottom, #140b30 0%, #1a0f3d 30%, #12082c 60%, var(--void) 100%);
+  }
+
+  .bg-stars {
+    position: fixed; inset: 0; z-index: -8;
+    background-image: 
+      radial-gradient(1.5px 1.5px at 20% 25%, rgba(255,255,255,.8) 50%, transparent 51%),
+      radial-gradient(1px 1px at 70% 12%, rgba(255,255,255,.6) 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 85% 40%, rgba(35,232,255,.7) 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 45% 18%, rgba(255,47,216,.6) 50%, transparent 51%);
+    background-size: 250px 250px;
+  }
+
+  .crt-overlay {
+    position: fixed; inset: 0; z-index: 10; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,.02) 0 1px, transparent 1px 3px);
+  }
+
+  /* Header & Navigation */
+  header {
+    width: 100%;
+    max-width: 1100px;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 5;
+  }
+
+  .back-btn {
+    display: inline-flex; align-items: center; gap: .5rem;
+    padding: .5rem 1rem;
+    font-family: 'Orbitron', sans-serif;
+    font-size: .75rem; font-weight: 700;
+    color: var(--cyan); text-decoration: none;
+    background: linear-gradient(90deg, rgba(255,47,216,.14), rgba(35,232,255,.14));
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    box-shadow: 0 0 0 1px rgba(35,232,255,.5) inset;
+    transition: all .2s ease;
+  }
+  .back-btn:hover {
+    color: #0a0014;
+    background: linear-gradient(90deg, var(--pink), var(--cyan));
+    box-shadow: 0 0 15px var(--cyan);
+  }
+
+  .title-wrapper {
+    text-align: center;
+  }
+  h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(1rem, 3vw, 1.6rem);
+    margin: 0;
+    color: var(--text-main);
+    text-shadow: 0 0 10px var(--pink), 0 0 20px var(--purple);
+  }
+  h1 .hi {
+    background: linear-gradient(120deg, var(--cyan), var(--pink));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  .audio-toggle-btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .5rem .8rem;
+    font-family: 'Orbitron', sans-serif;
+    font-size: .7rem; font-weight: 700;
+    color: var(--pink);
+    background: rgba(255,47,216,.1);
+    border: 1px solid var(--pink);
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .audio-toggle-btn:hover {
+    background: var(--pink);
+    color: #05010f;
+    box-shadow: 0 0 12px var(--pink);
+  }
+
+  /* Scoreboard & HUD */
+  .hud-container {
+    width: 100%;
+    max-width: 1000px;
+    margin: 0.5rem auto 1rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 1rem;
+    z-index: 5;
+  }
+
+  .score-card {
+    background: linear-gradient(165deg, var(--panel-a), var(--panel-b));
+    border: 1px solid rgba(35,232,255,.3);
+    border-radius: 8px;
+    padding: .6rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 0 15px rgba(139,47,255,.2);
+    min-width: 130px;
+  }
+  .score-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: .65rem;
+    color: var(--text-muted);
+    letter-spacing: .15em;
+    text-transform: uppercase;
+  }
+  .score-val {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 1.2rem;
+    color: var(--cyan);
+    margin-top: .3rem;
+    text-shadow: 0 0 8px var(--cyan);
+  }
+
+  .target-card {
+    background: linear-gradient(165deg, var(--panel-a), var(--panel-b));
+    border: 1px solid rgba(255,47,216,.3);
+    border-radius: 8px;
+    padding: .6rem 1.2rem;
+    text-align: center;
+    box-shadow: 0 0 15px rgba(255,47,216,.2);
+  }
+  .target-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: .65rem;
+    color: var(--text-muted);
+    letter-spacing: .15em;
+  }
+  .target-ball {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--pink);
+    text-shadow: 0 0 8px var(--pink);
+    margin-top: .2rem;
+  }
+
+  /* Game Canvas Wrapper */
+  .canvas-wrapper {
+    position: relative;
+    width: min(94vw, 1000px);
+    aspect-ratio: 2 / 1;
+    margin: 0 auto;
+    border-radius: 16px;
+    box-shadow: 
+      0 0 0 12px var(--wood),
+      0 0 0 16px var(--cushion),
+      0 0 40px rgba(0,0,0,.9),
+      0 0 25px rgba(35,232,255,.3);
+    z-index: 5;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 12px;
+    cursor: crosshair;
+  }
+
+  /* Controls Bar below Table */
+  .controls-bar {
+    width: min(94vw, 1000px);
+    margin: 1rem auto 2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(165deg, var(--panel-a), var(--panel-b));
+    padding: 0.8rem 1.2rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.1);
+    z-index: 5;
+  }
+
+  .power-box {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    flex: 1;
+    min-width: 200px;
+  }
+  .power-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: .75rem;
+    color: var(--lavender);
+  }
+  .power-bar-bg {
+    flex: 1;
+    height: 14px;
+    background: rgba(0,0,0,.6);
+    border-radius: 7px;
+    overflow: hidden;
+    border: 1px solid rgba(35,232,255,.4);
+  }
+  .power-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--cyan), var(--pink));
+    box-shadow: 0 0 10px var(--pink);
+    transition: width 0.05s linear;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: .6rem;
+  }
+
+  .action-btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: .75rem;
+    font-weight: 700;
+    padding: .6rem 1.2rem;
+    color: var(--cyan);
+    background: rgba(35,232,255,.1);
+    border: 1px solid var(--cyan);
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .action-btn:hover {
+    background: var(--cyan);
+    color: #05010f;
+    box-shadow: 0 0 12px var(--cyan);
+  }
+
+  .instructions {
+    text-align: center;
+    font-size: .85rem;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+    max-width: 800px;
+    line-height: 1.5;
+    z-index: 5;
+  }
+
+  @media (max-width: 600px) {
+    header { flex-direction: column; gap: .8rem; }
+    .hud-container { flex-direction: column; gap: .5rem; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="bg-night"></div>
+  <div class="bg-stars"></div>
+  <div class="crt-overlay"></div>
+
+  <header>
+    <a href="index.html" class="back-btn">◄ BACK TO CLUB</a>
+    <div class="title-wrapper">
+      <h1>8-BALL <span class="hi">POOL</span></h1>
+    </div>
+    <button id="musicToggle" class="audio-toggle-btn">♫ MUSIC: ON</button>
+  </header>
+
+  <div class="hud-container">
+    <div class="score-card">
+      <span class="score-title">PLAYER</span>
+      <span id="playerScore" class="score-val">0</span>
+    </div>
+
+    <div class="target-card">
+      <span class="target-label">ASSIGNED SUIT</span>
+      <div id="targetBall" class="target-ball">OPEN TABLE</div>
+    </div>
+
+    <div class="score-card">
+      <span class="score-title">BALLS REMAINING</span>
+      <span id="remainingCount" class="score-val">7</span>
+    </div>
+  </div>
+
+  <div class="canvas-wrapper">
+    <canvas id="poolCanvas" width="1000" height="500"></canvas>
+  </div>
+
+  <div class="controls-bar">
+    <div class="power-box">
+      <span class="power-label">SHOT POWER</span>
+      <div class="power-bar-bg">
+        <div id="powerFill" class="power-bar-fill"></div>
+      </div>
+    </div>
+    <div class="btn-group">
+      <button id="shootBtn" class="action-btn">SHOOT (SPACE)</button>
+      <button id="resetBtn" class="action-btn">RACK NEW GAME</button>
+    </div>
+  </div>
+
+  <div class="instructions">
+    <strong>HOW TO PLAY:</strong> Aim with your <strong>Mouse</strong> around the cue ball. Click & Hold left mouse button (or press Space) to charge your shot power, then release to strike. Sink your assigned suit (Solids or Stripes), then finish with the 8-Ball!
+  </div>
+
+  <script>
+  (function(){
+    var canvas = document.getElementById('poolCanvas');
+    var ctx = canvas.getContext('2d');
+
+    // UI elements
+    var playerScoreEl = document.getElementById('playerScore');
+    var remainingCountEl = document.getElementById('remainingCount');
+    var targetBallEl = document.getElementById('targetBall');
+    var powerFillEl = document.getElementById('powerFill');
+    var shootBtn = document.getElementById('shootBtn');
+    var resetBtn = document.getElementById('resetBtn');
+    var musicToggleBtn = document.getElementById('musicToggle');
+
+    // Audio Engine (Web Audio API)
+    var AudioContext = window.AudioContext || window.webkitAudioContext;
+    var audioCtx = null;
+    var musicPlaying = true;
+    var lofiInterval = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+        if (musicPlaying) startLofiTrack();
+      } else if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playCueSound(power) {
+      if (!audioCtx) return;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(150 + power * 2, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.12);
+      
+      gain.gain.setValueAtTime(Math.min(0.8, 0.2 + power / 100), audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.12);
+    }
+
+    function playCollisionSound(intensity) {
+      if (!audioCtx) return;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400 + Math.random() * 100, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+
+      gain.gain.setValueAtTime(Math.min(0.6, intensity * 0.1), audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+    }
+
+    function playPocketSound() {
+      if (!audioCtx) return;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.25);
+
+      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.25);
+    }
+
+    function startLofiTrack() {
+      if (lofiInterval) clearInterval(lofiInterval);
+
+      var chords = [
+        [261.63, 329.63, 392.00, 493.88], // Cmaj7
+        [220.00, 261.63, 329.63, 392.00], // Am7
+        [174.61, 220.00, 261.63, 329.63], // Fmaj7
+        [196.00, 246.94, 293.66, 349.23]  // G7
+      ];
+      var step = 0;
+
+      lofiInterval = setInterval(function() {
+        if (!musicPlaying || !audioCtx) return;
+
+        var chord = chords[step % chords.length];
+        step++;
+
+        chord.forEach(function(freq) {
+          var osc = audioCtx.createOscillator();
+          var gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+          gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.04, audioCtx.currentTime + 0.3);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2.2);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start();
+          osc.stop(audioCtx.currentTime + 2.3);
+        });
+      }, 2400);
+    }
+
+    musicToggleBtn.addEventListener('click', function() {
+      initAudio();
+      musicPlaying = !musicPlaying;
+      if (musicPlaying) {
+        musicToggleBtn.textContent = '♫ MUSIC: ON';
+        startLofiTrack();
+      } else {
+        musicToggleBtn.textContent = '♫ MUSIC: OFF';
+        if (lofiInterval) clearInterval(lofiInterval);
+      }
+    });
+
+    // Game Physics & Constants
+    var TABLE_MARGIN = 40;
+    var BALL_RADIUS = 10;
+    var FRICTION = 0.988;
+    var POCKET_RADIUS = 20;
+
+    var score = 0;
+    var playerSuit = null; // 'SOLID', 'STRIPE', or null (Open)
+
+    // Mouse & Power charging state
+    var mouse = { x: 0, y: 0 };
+    var aimAngle = 0;
+    var power = 0;
+    var isCharging = false;
+    var chargeDir = 1;
+
+    // 8-Ball Color Palette & Types
+    var BALL_DEFINITIONS = [
+      { num: 0, color: '#ffffff', type: 'CUE' },
+      { num: 1, color: '#ffbe0b', type: 'SOLID' },
+      { num: 2, color: '#3a86ff', type: 'SOLID' },
+      { num: 3, color: '#ff006e', type: 'SOLID' },
+      { num: 4, color: '#8338ec', type: 'SOLID' },
+      { num: 5, color: '#fb5607', type: 'SOLID' },
+      { num: 6, color: '#00f5d4', type: 'SOLID' },
+      { num: 7, color: '#70e000', type: 'SOLID' },
+      { num: 8, color: '#111111', type: 'EIGHT' },
+      { num: 9, color: '#ffbe0b', type: 'STRIPE' },
+      { num: 10, color: '#3a86ff', type: 'STRIPE' },
+      { num: 11, color: '#ff006e', type: 'STRIPE' },
+      { num: 12, color: '#8338ec', type: 'STRIPE' },
+      { num: 13, color: '#fb5607', type: 'STRIPE' },
+      { num: 14, color: '#00f5d4', type: 'STRIPE' },
+      { num: 15, color: '#70e000', type: 'STRIPE' }
+    ];
+
+    var balls = [];
+    var pockets = [];
+
+    var bounds = {
+      left: TABLE_MARGIN,
+      right: canvas.width - TABLE_MARGIN,
+      top: TABLE_MARGIN,
+      bottom: canvas.height - TABLE_MARGIN
+    };
+
+    function initPockets() {
+      pockets = [
+        { x: bounds.left + 5, y: bounds.top + 5 },
+        { x: (bounds.left + bounds.right)/2, y: bounds.top },
+        { x: bounds.right - 5, y: bounds.top + 5 },
+        { x: bounds.left + 5, y: bounds.bottom - 5 },
+        { x: (bounds.left + bounds.right)/2, y: bounds.bottom },
+        { x: bounds.right - 5, y: bounds.bottom - 5 }
+      ];
+    }
+
+    function Ball(x, y, info) {
+      this.x = x;
+      this.y = y;
+      this.vx = 0;
+      this.vy = 0;
+      this.info = info;
+      this.radius = BALL_RADIUS;
+      this.potted = false;
+    }
+
+    function resetTable() {
+      balls = [];
+      score = 0;
+      playerSuit = null;
+      updateUI();
+
+      // Cue Ball
+      var cueX = bounds.left + (bounds.right - bounds.left) * 0.25;
+      var cueY = (bounds.top + bounds.bottom) / 2;
+      balls.push(new Ball(cueX, cueY, BALL_DEFINITIONS[0]));
+
+      // Standard 8-Ball Triangle Rack Setup
+      var startX = bounds.left + (bounds.right - bounds.left) * 0.7;
+      var midY = (bounds.top + bounds.bottom) / 2;
+      
+      // Setup ordered rack with 8-ball centered
+      var rackOrder = [
+        1, 
+        9, 2, 
+        10, 8, 3, 
+        4, 11, 5, 12, 
+        13, 6, 14, 7, 15
+      ];
+
+      var idx = 0;
+      for (var r = 0; r < 5; r++) {
+        var rx = startX + r * (BALL_RADIUS * 1.732);
+        for (var c = 0; c <= r; c++) {
+          var ry = midY - (r * BALL_RADIUS) + (c * BALL_RADIUS * 2);
+          balls.push(new Ball(rx, ry, BALL_DEFINITIONS[rackOrder[idx]]));
+          idx++;
+        }
+      }
+    }
+
+    function isMoving() {
+      return balls.some(function(b){
+        return !b.potted && (Math.abs(b.vx) > 0.05 || Math.abs(b.vy) > 0.05);
+      });
+    }
+
+    function updatePhysics() {
+      balls.forEach(function(b) {
+        if (b.potted) return;
+
+        b.x += b.vx;
+        b.y += b.vy;
+
+        b.vx *= FRICTION;
+        b.vy *= FRICTION;
+
+        if (Math.abs(b.vx) < 0.02) b.vx = 0;
+        if (Math.abs(b.vy) < 0.02) b.vy = 0;
+
+        // Cushion Bounces
+        if (b.x - b.radius < bounds.left) { b.x = bounds.left + b.radius; b.vx *= -0.9; }
+        if (b.x + b.radius > bounds.right) { b.x = bounds.right - b.radius; b.vx *= -0.9; }
+        if (b.y - b.radius < bounds.top) { b.y = bounds.top + b.radius; b.vy *= -0.9; }
+        if (b.y + b.radius > bounds.bottom) { b.y = bounds.bottom - b.radius; b.vy *= -0.9; }
+
+        // Check Pockets
+        pockets.forEach(function(p) {
+          var dx = b.x - p.x;
+          var dy = b.y - p.y;
+          if (Math.sqrt(dx*dx + dy*dy) < POCKET_RADIUS) {
+            b.potted = true;
+            b.vx = 0; b.vy = 0;
+            playPocketSound();
+            onBallPotted(b);
+          }
+        });
+      });
+
+      // Ball to Ball Collisions
+      for (var i = 0; i < balls.length; i++) {
+        for (var j = i + 1; j < balls.length; j++) {
+          var b1 = balls[i];
+          var b2 = balls[j];
+          if (b1.potted || b2.potted) continue;
+
+          var dx = b2.x - b1.x;
+          var dy = b2.y - b1.y;
+          var dist = Math.sqrt(dx*dx + dy*dy);
+          var minDist = b1.radius + b2.radius;
+
+          if (dist < minDist) {
+            var angle = Math.atan2(dy, dx);
+            var sin = Math.sin(angle);
+            var cos = Math.cos(angle);
+
+            var overlap = minDist - dist;
+            b1.x -= cos * overlap * 0.5;
+            b1.y -= sin * overlap * 0.5;
+            b2.x += cos * overlap * 0.5;
+            b2.y += sin * overlap * 0.5;
+
+            var vx1 = b1.vx * cos + b1.vy * sin;
+            var vy1 = b1.vy * cos - b1.vx * sin;
+            var vx2 = b2.vx * cos + b2.vy * sin;
+            var vy2 = b2.vy * cos - b2.vx * sin;
+
+            b1.vx = vx2 * cos - vy1 * sin;
+            b1.vy = vy1 * cos + vx2 * sin;
+            b2.vx = vx1 * cos - vy2 * sin;
+            b2.vy = vy2 * cos + vx1 * sin;
+
+            var collisionSpeed = Math.sqrt((b1.vx - b2.vx)*(b1.vx - b2.vx) + (b1.vy - b2.vy)*(b1.vy - b2.vy));
+            playCollisionSound(collisionSpeed);
+          }
+        }
+      }
+    }
+
+    function onBallPotted(ball) {
+      if (ball.info.type === 'CUE') {
+        // Scratch / Respot Cue Ball
+        setTimeout(function(){
+          ball.potted = false;
+          ball.x = bounds.left + (bounds.right - bounds.left) * 0.25;
+          ball.y = (bounds.top + bounds.bottom) / 2;
+          ball.vx = 0; ball.vy = 0;
+        }, 800);
+        return;
+      }
+
+      if (ball.info.type === 'EIGHT') {
+        var remainingSuit = balls.filter(function(b) {
+          return !b.potted && b.info.type === playerSuit;
+        });
+
+        if (playerSuit && remainingSuit.length === 0) {
+          alert('GAME OVER: YOU WIN!');
+        } else {
+          alert('FOUL: SANK 8-BALL EARLY. YOU LOSE!');
+        }
+        resetTable();
+        return;
+      }
+
+      // Assign Suit on First Pot
+      if (!playerSuit) {
+        playerSuit = ball.info.type;
+      }
+
+      if (ball.info.type === playerSuit) {
+        score += 10;
+      }
+
+      updateUI();
+    }
+
+    function updateUI() {
+      playerScoreEl.textContent = score;
+      targetBallEl.textContent = playerSuit ? playerSuit + 'S' : 'OPEN TABLE';
+
+      if (playerSuit) {
+        var rem = balls.filter(function(b) {
+          return !b.potted && b.info.type === playerSuit;
+        }).length;
+        remainingCountEl.textContent = rem > 0 ? rem : '8-BALL!';
+      } else {
+        remainingCountEl.textContent = 7;
+      }
+    }
+
+    function drawTable() {
+      var grad = ctx.createRadialGradient(
+        canvas.width/2, canvas.height/2, 100,
+        canvas.width/2, canvas.height/2, 500
+      );
+      grad.addColorStop(0, '#0f5a3f');
+      grad.addColorStop(1, '#05291b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Cushions
+      ctx.strokeStyle = '#2a150c';
+      ctx.lineWidth = TABLE_MARGIN;
+      ctx.strokeRect(TABLE_MARGIN/2, TABLE_MARGIN/2, canvas.width - TABLE_MARGIN, canvas.height - TABLE_MARGIN);
+
+      // Headstring Line
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 1.5;
+      var headX = bounds.left + (bounds.right - bounds.left) * 0.25;
+      
+      ctx.beginPath();
+      ctx.moveTo(headX, bounds.top);
+      ctx.lineTo(headX, bounds.bottom);
+      ctx.stroke();
+
+      // Pockets
+      pockets.forEach(function(p) {
+        ctx.fillStyle = '#0a0a0a';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, POCKET_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+    }
+
+    function drawBalls() {
+      balls.forEach(function(b) {
+        if (b.potted) return;
+
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+
+        if (b.info.type === 'STRIPE') {
+          // Stripe Pattern
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+
+          ctx.save();
+          ctx.clip();
+          ctx.fillStyle = b.info.color;
+          ctx.fillRect(b.x - b.radius, b.y - b.radius * 0.5, b.radius * 2, b.radius);
+          ctx.restore();
+        } else {
+          // Solid / Cue / 8-Ball
+          ctx.fillStyle = b.info.color;
+          ctx.fill();
+        }
+
+        // Draw Ball Number (except Cue)
+        if (b.info.num > 0) {
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.radius * 0.45, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 8px Orbitron, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(b.info.num, b.x, b.y + 0.5);
+        }
+
+        // Specular Highlight
+        ctx.beginPath();
+        ctx.arc(b.x - b.radius * 0.3, b.y - b.radius * 0.3, b.radius * 0.25, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fill();
+      });
+    }
+
+    function drawCue() {
+      var cueBall = balls[0];
+      if (!cueBall || cueBall.potted || isMoving()) return;
+
+      var dx = mouse.x - cueBall.x;
+      var dy = mouse.y - cueBall.y;
+      aimAngle = Math.atan2(dy, dx);
+
+      // Aim Line
+      ctx.strokeStyle = 'rgba(35, 232, 255, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(cueBall.x, cueBall.y);
+      ctx.lineTo(cueBall.x + Math.cos(aimAngle) * 300, cueBall.y + Math.sin(aimAngle) * 300);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Cue Stick
+      var dist = 25 + (power / 100) * 40;
+      var cueStartX = cueBall.x - Math.cos(aimAngle) * dist;
+      var cueStartY = cueBall.y - Math.sin(aimAngle) * dist;
+      var cueEndX = cueBall.x - Math.cos(aimAngle) * (dist + 220);
+      var cueEndY = cueBall.y - Math.sin(aimAngle) * (dist + 220);
+
+      ctx.strokeStyle = '#d4a373';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(cueStartX, cueStartY);
+      ctx.lineTo(cueEndX, cueEndY);
+      ctx.stroke();
+    }
+
+    function loop() {
+      updatePhysics();
+
+      if (isCharging) {
+        power += chargeDir * 2;
+        if (power >= 100) { power = 100; chargeDir = -1; }
+        if (power <= 0) { power = 0; chargeDir = 1; }
+        powerFillEl.style.width = power + '%';
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawTable();
+      drawBalls();
+      drawCue();
+
+      requestAnimationFrame(loop);
+    }
+
+    function shoot() {
+      var cueBall = balls[0];
+      if (!cueBall || cueBall.potted || isMoving() || power <= 0) return;
+
+      playCueSound(power);
+
+      var force = (power / 100) * 18;
+      cueBall.vx = Math.cos(aimAngle) * force;
+      cueBall.vy = Math.sin(aimAngle) * force;
+
+      power = 0;
+      powerFillEl.style.width = '0%';
+    }
+
+    // Event Listeners
+    canvas.addEventListener('mousemove', function(e) {
+      var rect = canvas.getBoundingClientRect();
+      mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+      mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    });
+
+    window.addEventListener('mousedown', function(e) {
+      initAudio();
+      if (e.target === canvas || e.target === shootBtn) {
+        if (!isMoving()) isCharging = true;
+      }
+    });
+
+    window.addEventListener('mouseup', function() {
+      if (isCharging) {
+        isCharging = false;
+        shoot();
+      }
+    });
+
+    window.addEventListener('keydown', function(e) {
+      initAudio();
+      if (e.code === 'Space' && !isCharging && !isMoving()) {
+        e.preventDefault();
+        isCharging = true;
+      }
+    });
+
+    window.addEventListener('keyup', function(e) {
+      if (e.code === 'Space' && isCharging) {
+        e.preventDefault();
+        isCharging = false;
+        shoot();
+      }
+    });
+
+    resetBtn.addEventListener('click', resetTable);
+
+    // Initialization
+    initPockets();
+    resetTable();
+    loop();
+  })();
+  </script>
+
+</body>
+</html>
