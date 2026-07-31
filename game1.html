@@ -202,6 +202,7 @@
       0 0 40px rgba(0,0,0,.9),
       0 0 25px rgba(35,232,255,.3);
     z-index: 5;
+    touch-action: none;
   }
 
   canvas {
@@ -210,6 +211,7 @@
     display: block;
     border-radius: 12px;
     cursor: crosshair;
+    touch-action: none;
   }
 
   /* Controls Bar below Table */
@@ -272,6 +274,7 @@
     clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
     cursor: pointer;
     transition: all .2s;
+    touch-action: manipulation;
   }
   .action-btn:hover {
     background: var(--cyan);
@@ -846,12 +849,61 @@
       powerFillEl.style.width = '0%';
     }
 
+    // Touch Event Helper to get coordinates on canvas
+    function getTouchPos(e) {
+      var rect = canvas.getBoundingClientRect();
+      var touch = e.touches[0] || e.changedTouches[0];
+      return {
+        x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+        y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
     // Event Listeners
     canvas.addEventListener('mousemove', function(e) {
       var rect = canvas.getBoundingClientRect();
       mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
       mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
     });
+
+    // Touch Listeners for Mobile
+    canvas.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      initAudio();
+      var pos = getTouchPos(e);
+      mouse.x = pos.x;
+      mouse.y = pos.y;
+      if (!isMoving()) isCharging = true;
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+      var pos = getTouchPos(e);
+      mouse.x = pos.x;
+      mouse.y = pos.y;
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      if (isCharging) {
+        isCharging = false;
+        shoot();
+      }
+    }, { passive: false });
+
+    shootBtn.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      initAudio();
+      if (!isMoving()) isCharging = true;
+    }, { passive: false });
+
+    shootBtn.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      if (isCharging) {
+        isCharging = false;
+        shoot();
+      }
+    }, { passive: false });
 
     window.addEventListener('mousedown', function(e) {
       initAudio();
