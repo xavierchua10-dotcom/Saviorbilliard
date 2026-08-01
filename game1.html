@@ -1573,9 +1573,10 @@ function handleBallPlacement(e) {
 
 // Touch: press+drag to aim, release simply stops updating the aim (never
 // fires — firing on touch is still the on-screen power meter below).
-// Mouse: a single click-drag-release gesture now does everything — click
-// fixes the aim at the clicked point (no more continuous hover-aim), then
-// dragging (with the button held) builds shot power, and releasing fires.
+// Mouse: move freely (no button held) to aim — the crosshair follows the
+// cursor continuously. The instant you press the left button, the aim
+// locks exactly where it was; dragging from there builds shot power, and
+// releasing fires.
 let touchAiming = false;
 let mouseDragging = false;
 let mouseDragStartX = 0;
@@ -1594,9 +1595,13 @@ Canvas.addEventListener('pointermove', (e) => {
     return;
   }
   if (mouseDragging) {
+    // Locked: don't re-aim while dragging, just measure the pull for power.
     const dx = e.clientX - mouseDragStartX;
     const dy = e.clientY - mouseDragStartY;
     setShotPower((Math.hypot(dx, dy) / MOUSE_POWER_DRAG_PX) * 100);
+  } else {
+    // Free aim: no button held, so the crosshair just follows the cursor.
+    handlePointerAim(e);
   }
 });
 
@@ -1614,7 +1619,7 @@ Canvas.addEventListener('pointerdown', (e) => {
     return;
   }
   if (e.button === 0 && canShoot()) {
-    handlePointerAim(e); // fix the aim at the clicked point
+    handlePointerAim(e); // lock the aim exactly where the cursor is right now
     mouseDragging = true;
     mouseDragStartX = e.clientX;
     mouseDragStartY = e.clientY;
