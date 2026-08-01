@@ -50,9 +50,16 @@
   }
   .sound-btn.is-on { background: rgba(35, 232, 255, 0.2); border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
 
+  @media (max-width: 700px) and (orientation: portrait) {
+    .nav-bar { padding: 0.45rem 0.6rem; }
+    .back-btn, .sound-btn { font-size: 0.58rem; padding: 0.32rem 0.5rem; gap: 0.25rem; }
+    .game-title { font-size: clamp(0.65rem, 3.6vw, 0.95rem); }
+  }
+
   .dash {
+    position: relative;
     width: 95%; max-width: 1000px; background: var(--panel); border: 1px solid rgba(139, 47, 255, 0.4);
-    border-radius: 8px; padding: 0.8rem 1.2rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;
+    border-radius: 8px; padding: 0.8rem 3.4rem 0.8rem 1.2rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;
     box-shadow: 0 0 20px rgba(139, 47, 255, 0.2);
   }
   .score-box { display: flex; align-items: center; gap: 1.5rem; font-family: 'Orbitron', sans-serif; }
@@ -62,11 +69,52 @@
   .player-card.active .player-name { color: var(--cyan); }
   .player-pts { font-size: 1.1rem; font-weight: 800; color: var(--pink); }
 
+  /* Status ticker: floats as its own overlay pill hanging just below the
+     dash panel rather than sitting inline in the flex row. That keeps the
+     dash box (and everything below it, including the table) a fixed
+     height no matter how long the status text gets — long messages
+     truncate with an ellipsis instead of wrapping and pushing the whole
+     layout around. */
+  /* Status ticker: a small, subtle, no-background label floating in the
+     gap above the table (left-aligned so it doesn't sit over the table
+     itself). Absolutely positioned so it never affects the dash panel's
+     height — long messages just truncate with an ellipsis. */
   .status-text {
-    font-family: 'Orbitron', sans-serif; font-size: 0.85rem; color: var(--pink); font-weight: 600; letter-spacing: 0.05em; text-align: center;
+    position: absolute; left: 0.3rem; top: 100%; margin-top: 0.3rem;
+    max-width: min(62%, 380px); width: max-content;
+    padding: 0; background: none; border: none; box-shadow: none; border-radius: 0;
+    z-index: 40; pointer-events: none; opacity: 0.6;
+    font-family: 'Orbitron', sans-serif; font-size: 0.72rem; color: var(--pink); font-weight: 600; letter-spacing: 0.05em; text-align: left;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
-  .mode-controls { display: flex; align-items: center; gap: 0.6rem; }
+  /* Mode options (opponent, difficulty, 2P, rack) collapse behind a single
+     settings icon so the dash only shows the score by default. */
+  /* Pinned to the dash's top-right corner (out of the flex flow) so it can
+     never wrap onto its own row and bloat the panel's height. */
+  .settings-btn {
+    position: absolute; top: 0.7rem; right: 0.9rem; z-index: 60;
+    width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; line-height: 1; border-radius: 8px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.05); border: 1px solid var(--purple); color: var(--text-muted);
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.15s;
+  }
+  .settings-btn:hover { color: #fff; }
+  .settings-btn.is-open { background: var(--purple); color: #fff; border-color: var(--pink); box-shadow: 0 0 10px var(--pink); }
+  .settings-btn:active { transform: scale(0.94); }
+
+  .settings-panel {
+    position: absolute; right: 0.8rem; top: 100%; margin-top: 0.6rem; z-index: 50;
+    display: flex; flex-direction: column; gap: 0.5rem; min-width: 160px;
+    background: var(--panel); border: 1px solid rgba(139, 47, 255, 0.5); border-radius: 8px; padding: 0.7rem;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+    opacity: 0; visibility: hidden; transform: translateY(-6px);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+    pointer-events: none;
+  }
+  .settings-panel.is-open { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; }
+  .settings-panel .btn-opt { width: 100%; text-align: center; }
+
   .btn-opt {
     font-family: 'Orbitron', sans-serif; font-size: 0.7rem; font-weight: 700; padding: 0.4rem 0.8rem;
     background: rgba(255, 255, 255, 0.05); border: 1px solid var(--purple); color: var(--text-muted); cursor: pointer;
@@ -74,14 +122,62 @@
   }
   .btn-opt.active { background: var(--purple); color: #fff; border-color: var(--pink); box-shadow: 0 0 10px var(--pink); }
 
+  .table-area {
+    position: relative;
+    width: 95%; max-width: 1000px; margin: 0 auto; display: flex; align-items: center; justify-content: center;
+  }
+
   .table-wrapper {
-    position: relative; width: 95%; max-width: 1000px; aspect-ratio: 2 / 1; background: #000; border-radius: 12px;
+    position: relative; width: 88%; aspect-ratio: 2 / 1; background: #000; border-radius: 12px;
     box-shadow: 0 0 30px rgba(0,0,0,0.8), 0 0 1px 2px #2b3d6b; overflow: hidden; touch-action: none;
   }
   canvas { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
 
+  /* Power meter: press + drag/pull to build shot power, release to fire.
+     This is now the ONLY way to shoot — touching or dragging on the table
+     itself only aims the cue and never fires. It sits OUTSIDE the table
+     itself, in the margin next to it, so it reads as a HUD control rather
+     than blending into the felt. Positioned relative to .table-area (not
+     .table-wrapper) so it isn't clipped by the table's own overflow:hidden. */
+  .power-meter {
+    position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 20;
+    width: 8%; min-width: 34px; max-width: 56px; height: 74%;
+    display: flex; flex-direction: column; align-items: center;
+    background: rgba(19, 8, 36, 0.5); border: 1px solid rgba(35, 232, 255, 0.5); border-radius: 10px;
+    padding: 6% 8%; box-shadow: 0 0 14px rgba(35, 232, 255, 0.25);
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .power-meter-label {
+    font-family: 'Orbitron', sans-serif; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--text-muted);
+  }
+  .power-meter-pct {
+    font-family: 'Orbitron', sans-serif; font-size: 0.68rem; font-weight: 800; color: var(--cyan); margin: 0.1rem 0 0.4rem;
+  }
+  .power-meter-track {
+    position: relative; flex: 1 1 auto; width: 14px; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(35, 232, 255, 0.4); border-radius: 8px; cursor: pointer;
+  }
+  .power-meter-fill {
+    position: absolute; left: 1px; right: 1px; top: 1px; height: 0%; border-radius: 6px;
+    background: linear-gradient(180deg, var(--cyan), var(--pink));
+  }
+  .power-meter-handle {
+    position: absolute; left: 50%; top: 0%; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--cyan); border: 3px solid #fff; box-shadow: 0 0 10px var(--cyan);
+    transform: translate(-50%, -50%);
+  }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    .table-wrapper { width: auto; height: min(80vh, 44vw); aspect-ratio: 2 / 1; }
+  }
+
   @media (max-width: 700px) and (orientation: portrait) {
-    .table-wrapper { width: min(88vw, 36vh); max-width: none; aspect-ratio: 1 / 2; }
+    .table-wrapper { width: min(84vw, 44vh); aspect-ratio: 1 / 2; }
+    .power-meter { min-width: 28px; max-width: 44px; height: 32%; padding: 5% 7%; }
+    .power-meter-label { font-size: 0.48rem; }
+    .power-meter-pct { font-size: 0.58rem; margin: 0.08rem 0 0.3rem; }
+    .power-meter-track { width: 11px; }
+    .power-meter-handle { width: 20px; height: 20px; }
   }
 
   /* AI Thinking overlay: centered over the table, hidden on the player's turn.
@@ -107,36 +203,23 @@
     background: #ffffff; border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; padding: 0.55em 1.1em;
   }
 
+  @media (orientation: landscape) and (max-height: 500px) {
+    .ai-thinking-overlay .ai-thinking-avatar { height: clamp(70px, 24vh, 150px); }
+  }
+
   @media (max-width: 700px) and (orientation: portrait) {
     .ai-thinking-overlay .ai-thinking-avatar { height: clamp(84px, 38vw, 190px); }
   }
 
-  .controls-bar {
-    width: 95%; max-width: 1000px; margin-top: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-    background: var(--panel); border: 1px solid rgba(35, 232, 255, 0.3); padding: 0.8rem 1.2rem; border-radius: 8px;
-  }
-  .power-wrap { flex: 1; display: flex; flex-direction: column; gap: 0.3rem; }
-  .power-label { font-family: 'Orbitron', sans-serif; font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.1em; }
-  .power-slider {
-    width: 100%; -webkit-appearance: none; appearance: none; height: 10px; background: #1a0f30; border-radius: 5px; outline: none; border: 1px solid var(--purple);
-  }
-  .power-slider::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--cyan); cursor: pointer; box-shadow: 0 0 10px var(--cyan);
-  }
-  .shoot-btn {
-    font-family: 'Orbitron', sans-serif; font-size: 0.9rem; font-weight: 800; padding: 0.7rem 1.8rem; color: #0a0014;
-    background: linear-gradient(90deg, var(--pink), var(--cyan)); border: none; cursor: pointer;
-    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    box-shadow: 0 0 15px var(--pink); transition: transform 0.1s, box-shadow 0.2s;
-  }
-  .shoot-btn:active { transform: scale(0.96); }
-
-  @media (max-width: 700px) {
-    .dash { flex-direction: column; align-items: stretch; gap: 0.6rem; }
-    .score-box { justify-content: space-between; }
-    .mode-controls { justify-content: center; flex-wrap: wrap; }
-    .controls-bar { flex-wrap: wrap; }
-    .shoot-btn { flex: 1; min-width: 120px; }
+  @media (max-width: 700px) and (orientation: portrait) {
+    .dash { flex-direction: column; align-items: center; gap: 0.3rem; padding: 0.4rem 2.6rem 0.4rem 0.7rem; }
+    .score-box { justify-content: center; gap: 0.9rem; }
+    .player-name { font-size: 0.6rem; letter-spacing: 0.08em; }
+    .player-pts { font-size: 0.95rem; }
+    .vs-badge { font-size: 0.65rem; }
+    .settings-btn { top: 0.45rem; right: 0.5rem; width: 30px; height: 30px; font-size: 0.95rem; }
+    .settings-panel { right: 0.5rem; min-width: 150px; }
+    .status-text { max-width: 60vw; font-size: 0.65rem; margin-top: 0.2rem; }
   }
 
   /* ---- Intro cutscene: character + speech bubble storyline shown once
@@ -209,7 +292,14 @@
     100% { transform: scale(1); opacity: 1; }
   }
 
-  @media (max-width: 700px) {
+  @media (orientation: landscape) and (max-height: 500px) {
+    .intro-character { height: clamp(110px, 30vh, 220px); }
+    .intro-bubble { max-width: 380px; padding: 0.7rem 1rem; margin-bottom: clamp(16px, 6vh, 50px); }
+    .intro-bubble-text { font-size: 0.78rem; line-height: 1.4; }
+    .intro-controls { padding: 0 1rem 0.6rem; }
+  }
+
+  @media (max-width: 700px) and (orientation: portrait) {
     .intro-stage { flex-direction: column; align-items: center; justify-content: flex-end; padding: 1rem 1rem 0.4rem; }
     .intro-character { max-width: 70%; height: clamp(150px, 44vw, 260px); }
     .intro-bubble { margin-bottom: 0; max-width: 94vw; }
@@ -234,38 +324,39 @@
       </div>
       <span class="vs-badge">VS</span>
       <div id="p2Card" class="player-card">
-        <span class="player-name" id="p2Name">AI (MED)</span>
+        <span class="player-name" id="p2Name">Savior (MED)</span>
         <span class="player-pts" id="p2Group">OPEN TABLE</span>
       </div>
     </div>
 
     <div class="status-text" id="statusText">BREAK THE RACK!</div>
 
-    <div class="mode-controls">
-      <button class="btn-opt" id="btnVsAi">VS AI</button>
+    <button id="settingsBtn" class="settings-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="settingsPanel" title="Game settings">⚙</button>
+    <div id="settingsPanel" class="settings-panel" role="menu" aria-hidden="true">
+      <button class="btn-opt" id="btnVsAi">VS Savior</button>
       <button class="btn-opt active" id="btnDiff">DIFF: MED</button>
       <button class="btn-opt" id="btn2P">2 PLAYER</button>
       <button class="btn-opt" id="btnReset">RACK</button>
     </div>
   </div>
 
-  <div class="table-wrapper">
-    <canvas id="gameCanvas" width="1000" height="500"></canvas>
-    <div id="aiThinkingOverlay" class="ai-thinking-overlay" aria-hidden="true">
-      <img id="aiThinkingAvatar" class="ai-thinking-avatar" alt="" draggable="false">
-      <span class="ai-thinking-text">Is that what you got?</span>
-    </div>
-  </div>
-
-  <div class="controls-bar">
-    <div class="power-wrap">
-      <div style="display:flex; justify-content:space-between;">
-        <span class="power-label">SHOT POWER</span>
-        <span class="power-label" id="powerVal">50%</span>
+  <div class="table-area">
+    <div class="table-wrapper">
+      <canvas id="gameCanvas" width="1000" height="500"></canvas>
+      <div id="aiThinkingOverlay" class="ai-thinking-overlay" aria-hidden="true">
+        <img id="aiThinkingAvatar" class="ai-thinking-avatar" alt="" draggable="false">
+        <span class="ai-thinking-text">Is that what you got?</span>
       </div>
-      <input type="range" id="powerSlider" class="power-slider" min="10" max="100" value="50">
     </div>
-    <button id="shootBtn" class="shoot-btn">STRIKE</button>
+
+    <div id="powerMeter" class="power-meter">
+      <div class="power-meter-label">POWER</div>
+      <div class="power-meter-pct" id="powerMeterPct">0%</div>
+      <div id="powerMeterTrack" class="power-meter-track">
+        <div id="powerMeterFill" class="power-meter-fill"></div>
+        <div id="powerMeterHandle" class="power-meter-handle"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Intro cutscene: Savior greets the player before the match. Unlike the
@@ -775,6 +866,9 @@ class Ball {
 let balls = [];
 let cueBall;
 let aimAngle = 0;
+// Live power level (0-100) from the power-meter drag, used both for the idle
+// cue pull-back visual and as the actual shot strength when the meter is released.
+let shotPower = 0;
 let gameMode = 'VS_AI';
 let aiDifficulty = 'MED';
 let currentPlayer = 1;
@@ -964,7 +1058,6 @@ function processShotResults() {
         const firstType = validPotted[0].info.type;
         playerGroups[currentPlayer] = firstType;
         playerGroups[currentPlayer === 1 ? 2 : 1] = firstType === 'solid' ? 'stripe' : 'solid';
-        setStatus(`TABLE ASSIGNED: PLAYER ${currentPlayer} IS ${firstType.toUpperCase()}S`);
       }
       switchTurn = false;
     } else {
@@ -1104,8 +1197,7 @@ function render(timestamp) {
   }
 
   if(!isMoving && !cueBall.inPocket && !ballInHand) {
-    const powerVal = parseInt(document.getElementById('powerSlider').value);
-    const baseDistance = isStriking ? cueAnimOffset : 15 + (powerVal / 100) * 35;
+    const baseDistance = isStriking ? cueAnimOffset : 20 + (shotPower / 100) * 40;
 
     ctx.save();
     ctx.strokeStyle = 'rgba(35, 232, 255, 0.6)';
@@ -1216,9 +1308,10 @@ function handleBallPlacement(e) {
   cueBall.vx = 0; cueBall.vy = 0;
 }
 
-// Bug fix: on touch devices there's no hover, so the old code fired blind on the very first
-// tap (no chance to preview the shot). Touch now works like a slingshot: press+drag to aim,
-// lift to fire — mirroring how a mouse hovers to aim then clicks to fire.
+// Touch/mouse on the table now ONLY aims — it never fires a shot. Press+drag
+// (touch) or just hover (mouse) to point the cue; releasing simply stops
+// updating the aim and leaves the cue exactly where it was last pointed.
+// Firing is handled exclusively by the power meter's own pointer handlers below.
 let touchAiming = false;
 
 Canvas.addEventListener('pointermove', (e) => {
@@ -1246,7 +1339,6 @@ Canvas.addEventListener('pointerdown', (e) => {
   }
   if (e.button === 0) {
     handlePointerAim(e);
-    fireCue(document.getElementById('powerSlider').value);
   }
 });
 
@@ -1261,7 +1353,6 @@ Canvas.addEventListener('pointerup', (e) => {
   if (e.pointerType === 'touch' && touchAiming) {
     touchAiming = false;
     handlePointerAim(e);
-    fireCue(document.getElementById('powerSlider').value);
   }
 });
 
@@ -1269,18 +1360,94 @@ Canvas.addEventListener('pointercancel', () => { touchAiming = false; });
 
 Canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-document.getElementById('powerSlider').addEventListener('input', (e) => {
-  document.getElementById('powerVal').textContent = e.target.value + '%';
+// ---- Power meter: press + drag/pull to build power, release to fire. ----
+// Works identically for touch (finger drag) and mouse (click-drag-release)
+// via the Pointer Events API. Uses pointer capture so the drag keeps tracking
+// even if the finger/cursor strays outside the narrow track while pulling.
+const powerMeterTrack = document.getElementById('powerMeterTrack');
+const powerMeterFill = document.getElementById('powerMeterFill');
+const powerMeterHandle = document.getElementById('powerMeterHandle');
+const powerMeterPct = document.getElementById('powerMeterPct');
+let meterDragging = false;
+
+function setShotPower(pct) {
+  shotPower = Math.max(0, Math.min(100, pct));
+  powerMeterFill.style.height = shotPower + '%';
+  powerMeterHandle.style.top = shotPower + '%';
+  powerMeterPct.textContent = Math.round(shotPower) + '%';
+}
+
+function updateMeterFromEvent(e) {
+  const rect = powerMeterTrack.getBoundingClientRect();
+  const relY = e.clientY - rect.top;
+  const fraction = relY / rect.height; // 0% at the top (rest), 100% at the bottom (full pull)
+  setShotPower(fraction * 100);
+}
+
+function canShoot() {
+  return !(isMoving || isAiTurn || isStriking || gameOver || ballInHand);
+}
+
+powerMeterTrack.addEventListener('pointerdown', (e) => {
+  if (!canShoot()) return;
+  meterDragging = true;
+  powerMeterTrack.setPointerCapture(e.pointerId);
+  updateMeterFromEvent(e);
+  e.preventDefault();
 });
 
-document.getElementById('shootBtn').addEventListener('click', () => {
-  if(isMoving || isAiTurn || isStriking || ballInHand) return;
-  fireCue(document.getElementById('powerSlider').value);
+powerMeterTrack.addEventListener('pointermove', (e) => {
+  if (!meterDragging) return;
+  updateMeterFromEvent(e);
+});
+
+function releaseMeter(e) {
+  if (!meterDragging) return;
+  meterDragging = false;
+  const powerToFire = shotPower;
+  setShotPower(0);
+  // Ignore tiny accidental taps/drags — require a deliberate pull before firing.
+  if (powerToFire >= 4 && canShoot()) fireCue(powerToFire);
+}
+
+powerMeterTrack.addEventListener('pointerup', releaseMeter);
+powerMeterTrack.addEventListener('pointercancel', () => { meterDragging = false; setShotPower(0); });
+
+// ---- Settings popover: collapses the opponent/difficulty/2P/rack buttons
+// behind a single gear icon so the dash normally just shows the score. ----
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+
+function closeSettingsPanel() {
+  settingsPanel.classList.remove('is-open');
+  settingsBtn.classList.remove('is-open');
+  settingsBtn.setAttribute('aria-expanded', 'false');
+  settingsPanel.setAttribute('aria-hidden', 'true');
+}
+
+settingsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = settingsPanel.classList.toggle('is-open');
+  settingsBtn.classList.toggle('is-open', open);
+  settingsBtn.setAttribute('aria-expanded', String(open));
+  settingsPanel.setAttribute('aria-hidden', String(!open));
+});
+
+// Closing on an option click happens after that option's own handler runs
+// (listener registration order below), and clicking anywhere else outside
+// the panel also closes it.
+settingsPanel.addEventListener('click', (e) => {
+  if (e.target.closest('.btn-opt')) closeSettingsPanel();
+});
+document.addEventListener('click', (e) => {
+  if (settingsPanel.classList.contains('is-open') && !settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+    closeSettingsPanel();
+  }
 });
 
 document.getElementById('btnVsAi').addEventListener('click', () => {
   gameMode = 'VS_AI';
-  document.getElementById('p2Name').textContent = `AI (${aiDifficulty})`;
+  document.getElementById('p2Name').textContent = `Savior (${aiDifficulty})`;
   document.getElementById('btnVsAi').classList.add('active');
   document.getElementById('btn2P').classList.remove('active');
   setup8BallRack();
@@ -1300,7 +1467,7 @@ document.getElementById('btnDiff').addEventListener('click', () => {
   else aiDifficulty = 'EASY';
 
   document.getElementById('btnDiff').textContent = `DIFF: ${aiDifficulty}`;
-  if(gameMode === 'VS_AI') document.getElementById('p2Name').textContent = `AI (${aiDifficulty})`;
+  if(gameMode === 'VS_AI') document.getElementById('p2Name').textContent = `Savior (${aiDifficulty})`;
 });
 
 document.getElementById('btnReset').addEventListener('click', setup8BallRack);
