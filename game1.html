@@ -33,7 +33,7 @@
   }
 
   .nav-bar {
-    width: 100%; max-width: 1100px; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; z-index: 10;
+    width: 100%; max-width: 1600px; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; z-index: 10;
   }
   .back-btn {
     font-family: 'Orbitron', sans-serif; font-size: 0.8rem; font-weight: 700; color: var(--cyan);
@@ -62,7 +62,7 @@
 
   .dash {
     position: relative;
-    width: 95%; max-width: 1000px; background: var(--panel); border: 1px solid rgba(139, 47, 255, 0.4);
+    width: 95%; max-width: 1600px; background: var(--panel); border: 1px solid rgba(139, 47, 255, 0.4);
     border-radius: 8px; padding: 0.8rem 3.4rem 0.8rem 1.2rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;
     box-shadow: 0 0 20px rgba(139, 47, 255, 0.2);
   }
@@ -129,24 +129,32 @@
 
   .table-area {
     position: relative;
-    width: 95%; max-width: 1000px; margin: 0 auto; display: flex; align-items: center; justify-content: center;
+    width: 95%; max-width: 1600px; margin: 0 auto; display: flex; align-items: center; justify-content: center;
   }
 
   .table-wrapper {
-    position: relative; width: 88%; aspect-ratio: 2 / 1; background: #000; border-radius: 12px;
+    position: relative; width: min(82vw, 1400px, 164vh); aspect-ratio: 2 / 1; background: #000; border-radius: 12px;
     box-shadow: 0 0 30px rgba(0,0,0,0.8), 0 0 1px 2px var(--cushion-rim); overflow: hidden; touch-action: none;
   }
   canvas { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
 
-  /* Power meter: press + drag/pull to build shot power, release to fire.
-     This is now the ONLY way to shoot — touching or dragging on the table
-     itself only aims the cue and never fires. It sits OUTSIDE the table
-     itself, in the margin next to it, so it reads as a HUD control rather
-     than blending into the felt. Positioned relative to .table-area (not
-     .table-wrapper) so it isn't clipped by the table's own overflow:hidden. */
-  .power-meter {
+  /* Table-side controls: a positioned group (outside the table felt, in the
+     margin beside it) holding the power meter and, below it, the cue-ball
+     spin selector. Grouping them lets both share one absolute anchor and
+     stack with a simple flex gap instead of separate position math. */
+  .table-side-controls {
     position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 20;
     width: 8%; min-width: 34px; max-width: 56px; height: 74%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8%;
+  }
+
+  /* Power meter: press + drag/pull to build shot power, release to fire.
+     This is now the ONLY way to shoot on touch — touching or dragging on
+     the table itself only aims the cue and never fires. It sits OUTSIDE
+     the table itself, in the margin next to it, so it reads as a HUD
+     control rather than blending into the felt. */
+  .power-meter {
+    width: 100%; flex: 1 1 auto; min-height: 0;
     display: flex; flex-direction: column; align-items: center;
     background: rgba(19, 8, 36, 0.5); border: 1px solid rgba(35, 232, 255, 0.5); border-radius: 10px;
     padding: 6% 8%; box-shadow: 0 0 14px rgba(35, 232, 255, 0.25);
@@ -172,17 +180,93 @@
     transform: translate(-50%, -50%);
   }
 
+  /* Cue-ball spin selector: tap/drag anywhere on the little cue ball to set
+     where the tip strikes it — top/bottom for follow/draw (topspin/backspin),
+     left/right for side-spin ("english"). Center = plain, no-spin hit. Stays
+     visible on every device (mouse included), since it's a separate control
+     from aiming/power. */
+  .spin-selector {
+    width: 100%; flex: none; display: flex; flex-direction: column; align-items: center;
+    background: rgba(19, 8, 36, 0.5); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 10px;
+    padding: 8% 8%; box-shadow: 0 0 14px rgba(0, 0, 0, 0.25);
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .spin-selector-label {
+    font-family: 'Orbitron', sans-serif; font-size: 0.5rem; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 8%;
+  }
+  .spin-pad {
+    position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 50%; cursor: pointer;
+    background: radial-gradient(circle at 34% 28%, #ffffff, #ded6c4 55%, #b7ab8f 100%);
+    border: 2px solid rgba(0, 0, 0, 0.45); box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.35);
+  }
+  .spin-dot {
+    position: absolute; width: 26%; height: 26%; border-radius: 50%; left: 50%; top: 50%;
+    background: #e5342f; border: 1px solid rgba(0, 0, 0, 0.45); box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+    transform: translate(-50%, -50%);
+  }
+
+  /* Spin overlay: opened by tapping the small cue-ball widget, for precise
+     tuning on a much bigger version of the same control. Works identically
+     on touch and mouse — same drag-to-set-spin logic, just at a larger size. */
+  .spin-overlay {
+    position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center;
+    opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+  .spin-overlay.is-open { opacity: 1; visibility: visible; }
+  .spin-overlay-backdrop {
+    position: absolute; inset: 0; background: rgba(5, 1, 15, 0.82); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  }
+  .spin-overlay-panel {
+    position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 0.9rem;
+    background: var(--panel); border: 1px solid rgba(35, 232, 255, 0.5); border-radius: 16px; padding: 1.5rem 1.8rem;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  }
+  .spin-overlay-title {
+    font-family: 'Orbitron', sans-serif; font-weight: 800; letter-spacing: 0.08em; font-size: 0.9rem; color: var(--cyan);
+  }
+  .spin-pad-big {
+    position: relative; width: min(52vw, 220px); height: min(52vw, 220px); border-radius: 50%; cursor: pointer;
+    background: radial-gradient(circle at 34% 28%, #ffffff, #ded6c4 55%, #b7ab8f 100%);
+    border: 3px solid rgba(0, 0, 0, 0.45); box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.35), 0 0 20px rgba(35, 232, 255, 0.25);
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .spin-dot-big {
+    position: absolute; width: 15%; height: 15%; border-radius: 50%; left: 50%; top: 50%;
+    background: #e5342f; border: 2px solid rgba(0, 0, 0, 0.45); box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+    transform: translate(-50%, -50%);
+  }
+  .spin-overlay-hint {
+    font-family: 'Orbitron', sans-serif; font-size: 0.68rem; color: var(--text-muted); text-align: center; max-width: 220px;
+  }
+  .spin-overlay-close {
+    font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 0.75rem; letter-spacing: 0.06em;
+    padding: 0.55em 1.4em; background: linear-gradient(90deg, var(--pink), var(--cyan)); color: #0a0014;
+    border: none; border-radius: 6px; cursor: pointer;
+  }
+
+  /* On a mouse-driven device (laptop/desktop trackpad or mouse), shooting is
+     done by clicking, dragging, and releasing directly on the table itself
+     (see the pointer handlers in the script), so the separate on-screen
+     meter widget isn't needed there — it stays for touch devices, where
+     `pointer: coarse` / `hover: none` normally apply instead. The spin
+     selector, however, stays visible everywhere since it's independent
+     of how aiming/power are controlled. */
+  @media (hover: hover) and (pointer: fine) {
+    .power-meter { display: none; }
+  }
+
   @media (orientation: landscape) and (max-height: 500px) {
     .table-wrapper { width: auto; height: min(80vh, 44vw); aspect-ratio: 2 / 1; }
   }
 
   @media (max-width: 700px) and (orientation: portrait) {
     .table-wrapper { width: min(84vw, 44vh); aspect-ratio: 1 / 2; }
-    .power-meter { min-width: 28px; max-width: 44px; height: 32%; padding: 5% 7%; }
+    .table-side-controls { min-width: 28px; max-width: 44px; height: 32%; }
     .power-meter-label { font-size: 0.48rem; }
     .power-meter-pct { font-size: 0.58rem; margin: 0.08rem 0 0.3rem; }
     .power-meter-track { width: 11px; }
     .power-meter-handle { width: 20px; height: 20px; }
+    .spin-selector-label { font-size: 0.44rem; }
   }
 
   /* AI Thinking overlay: centered over the table, hidden on the player's turn.
@@ -367,13 +451,38 @@
       </div>
     </div>
 
-    <div id="powerMeter" class="power-meter">
-      <div class="power-meter-label">POWER</div>
-      <div class="power-meter-pct" id="powerMeterPct">0%</div>
-      <div id="powerMeterTrack" class="power-meter-track">
-        <div id="powerMeterFill" class="power-meter-fill"></div>
-        <div id="powerMeterHandle" class="power-meter-handle"></div>
+    <div class="table-side-controls">
+      <div id="powerMeter" class="power-meter">
+        <div class="power-meter-label">POWER</div>
+        <div class="power-meter-pct" id="powerMeterPct">0%</div>
+        <div id="powerMeterTrack" class="power-meter-track">
+          <div id="powerMeterFill" class="power-meter-fill"></div>
+          <div id="powerMeterHandle" class="power-meter-handle"></div>
+        </div>
       </div>
+
+      <div id="spinSelector" class="spin-selector">
+        <div class="spin-selector-label">SPIN</div>
+        <div id="spinPad" class="spin-pad">
+          <div id="spinDot" class="spin-dot"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spin adjustment overlay: tapping the small cue-ball widget opens this
+       larger panel for precise tuning. Closes via DONE or tapping outside;
+       the chosen spin is used for the very next shot, then resets to
+       dead-centre (see fireCue) so it doesn't silently carry over. -->
+  <div id="spinOverlay" class="spin-overlay" aria-hidden="true">
+    <div class="spin-overlay-backdrop"></div>
+    <div class="spin-overlay-panel">
+      <div class="spin-overlay-title">CUE BALL SPIN</div>
+      <div id="spinPadBig" class="spin-pad-big">
+        <div id="spinDotBig" class="spin-dot-big"></div>
+      </div>
+      <div class="spin-overlay-hint">Tap where the tip should strike the ball</div>
+      <button id="spinOverlayClose" class="spin-overlay-close" type="button">DONE</button>
     </div>
   </div>
 
@@ -773,10 +882,22 @@ class Ball {
     const minY = TABLE.y + TABLE.r;
     const maxY = TABLE.y + TABLE.h - TABLE.r;
 
-    if(this.x < minX) { this.x = minX; this.vx *= -0.85; AudioEngine.playClack(Math.abs(this.vx)); }
-    if(this.x > maxX) { this.x = maxX; this.vx *= -0.85; AudioEngine.playClack(Math.abs(this.vx)); }
-    if(this.y < minY) { this.y = minY; this.vy *= -0.85; AudioEngine.playClack(Math.abs(this.vy)); }
-    if(this.y > maxY) { this.y = maxY; this.vy *= -0.85; AudioEngine.playClack(Math.abs(this.vy)); }
+    if(this.x < minX) { this.x = minX; this.vx *= -0.85; this.applyCueSpinOnCushion(); AudioEngine.playClack(Math.abs(this.vx)); }
+    if(this.x > maxX) { this.x = maxX; this.vx *= -0.85; this.applyCueSpinOnCushion(); AudioEngine.playClack(Math.abs(this.vx)); }
+    if(this.y < minY) { this.y = minY; this.vy *= -0.85; this.applyCueSpinOnCushion(); AudioEngine.playClack(Math.abs(this.vy)); }
+    if(this.y > maxY) { this.y = maxY; this.vy *= -0.85; this.applyCueSpinOnCushion(); AudioEngine.playClack(Math.abs(this.vy)); }
+  }
+
+  // Simplified side-spin ("english"): nudges the cue ball's rebound off a
+  // cushion sideways, approximating the curve a real side-spun cue ball
+  // takes off the rail. Only affects the cue ball, and only while spinX
+  // (set via the cue-ball spin selector before the shot) is non-zero.
+  applyCueSpinOnCushion() {
+    if (this !== cueBall || shotSpinX === 0) return;
+    const travelAngle = Math.atan2(this.vy, this.vx);
+    const kick = shotSpinX * 0.3 * Math.hypot(this.vx, this.vy);
+    this.vx += Math.cos(travelAngle + Math.PI / 2) * kick;
+    this.vy += Math.sin(travelAngle + Math.PI / 2) * kick;
   }
 
   draw() {
@@ -851,6 +972,18 @@ let aimAngle = 0;
 // Live power level (0-100) from the power-meter drag, used both for the idle
 // cue pull-back visual and as the actual shot strength when the meter is released.
 let shotPower = 0;
+// Where the cue tip strikes the cue ball, set via the cue-ball spin selector.
+// Both range -1 to 1: spinY negative = hit above center (topspin/follow),
+// positive = below center (backspin/draw); spinX negative/positive = left/right
+// of center (side-spin/"english"). 0,0 = dead centre, a plain stun shot.
+let spinX = 0;
+let spinY = 0;
+// Snapshot of spinX/spinY taken the instant a shot is fired — the physics
+// below reads THESE, not the live spinX/spinY, since the selector resets to
+// dead-centre right when you shoot (so it doesn't silently carry over) while
+// the ball is still travelling with whatever spin it was actually struck with.
+let shotSpinX = 0;
+let shotSpinY = 0;
 let gameMode = 'VS_AI';
 let aiDifficulty = 'MED';
 let currentPlayer = 1;
@@ -988,6 +1121,12 @@ function resolveCollisions() {
       const dist = Math.hypot(dx, dy);
 
       if(dist < TABLE.r * 2) {
+        const cueIsB1 = (b1 === cueBall);
+        const cueIsB2 = (b2 === cueBall);
+        const isFirstCueContact = !firstBallHit && (cueIsB1 || cueIsB2);
+        const cuePreVx = cueIsB1 ? b1.vx : (cueIsB2 ? b2.vx : 0);
+        const cuePreVy = cueIsB1 ? b1.vy : (cueIsB2 ? b2.vy : 0);
+
         if(!firstBallHit && b1 === cueBall) firstBallHit = b2;
         if(!firstBallHit && b2 === cueBall) firstBallHit = b1;
 
@@ -1006,6 +1145,19 @@ function resolveCollisions() {
         b1.vy = vy1 * cos + finalVx1 * sin;
         b2.vx = finalVx2 * cos - vy2 * sin;
         b2.vy = vy2 * cos + finalVx2 * sin;
+
+        // Simplified spin (from the cue-ball hit-position selector): a follow
+        // shot (topspin, spinY<0) keeps the cue ball drifting on through after
+        // contact; a draw shot (backspin, spinY>0) pulls it back. Only applies
+        // on the cue ball's very first contact of the shot.
+        if (isFirstCueContact && shotSpinY !== 0) {
+          const cue = cueIsB1 ? b1 : b2;
+          const preSpeed = Math.hypot(cuePreVx, cuePreVy);
+          const preAngle = Math.atan2(cuePreVy, cuePreVx);
+          const kick = shotSpinY * -0.55 * preSpeed; // top hit (spinY<0) -> follow forward; bottom hit -> draw back
+          cue.vx += Math.cos(preAngle) * kick;
+          cue.vy += Math.sin(preAngle) * kick;
+        }
 
         const overlap = (TABLE.r * 2) - dist;
         b1.x -= (overlap/2) * cos;
@@ -1183,6 +1335,12 @@ function fireCue(powerPercent) {
 
   const power = (powerPercent / 100) * 22;
   const startOffset = 20 + (powerPercent / 100) * 40;
+
+  // This shot travels with whatever spin was dialled in; the selector then
+  // resets to dead-centre immediately so the next shot starts fresh.
+  shotSpinX = spinX;
+  shotSpinY = spinY;
+  setSpin(0, 0);
 
   let currentOffset = startOffset;
   const strikeInterval = setInterval(() => {
@@ -1413,11 +1571,16 @@ function handleBallPlacement(e) {
   cueBall.vx = 0; cueBall.vy = 0;
 }
 
-// Touch/mouse on the table now ONLY aims — it never fires a shot. Press+drag
-// (touch) or just hover (mouse) to point the cue; releasing simply stops
-// updating the aim and leaves the cue exactly where it was last pointed.
-// Firing is handled exclusively by the power meter's own pointer handlers below.
+// Touch: press+drag to aim, release simply stops updating the aim (never
+// fires — firing on touch is still the on-screen power meter below).
+// Mouse: a single click-drag-release gesture now does everything — click
+// fixes the aim at the clicked point (no more continuous hover-aim), then
+// dragging (with the button held) builds shot power, and releasing fires.
 let touchAiming = false;
+let mouseDragging = false;
+let mouseDragStartX = 0;
+let mouseDragStartY = 0;
+const MOUSE_POWER_DRAG_PX = 180; // full mouse-drag distance (px) for 100% power
 
 Canvas.addEventListener('pointermove', (e) => {
   if (ballInHand) {
@@ -1425,8 +1588,16 @@ Canvas.addEventListener('pointermove', (e) => {
     handleBallPlacement(e);
     return;
   }
-  if (e.pointerType === 'touch' && !touchAiming) return;
-  handlePointerAim(e);
+  if (e.pointerType === 'touch') {
+    if (!touchAiming) return;
+    handlePointerAim(e);
+    return;
+  }
+  if (mouseDragging) {
+    const dx = e.clientX - mouseDragStartX;
+    const dy = e.clientY - mouseDragStartY;
+    setShotPower((Math.hypot(dx, dy) / MOUSE_POWER_DRAG_PX) * 100);
+  }
 });
 
 Canvas.addEventListener('pointerdown', (e) => {
@@ -1442,8 +1613,13 @@ Canvas.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     return;
   }
-  if (e.button === 0) {
-    handlePointerAim(e);
+  if (e.button === 0 && canShoot()) {
+    handlePointerAim(e); // fix the aim at the clicked point
+    mouseDragging = true;
+    mouseDragStartX = e.clientX;
+    mouseDragStartY = e.clientY;
+    setShotPower(0);
+    Canvas.setPointerCapture(e.pointerId);
   }
 });
 
@@ -1458,17 +1634,28 @@ Canvas.addEventListener('pointerup', (e) => {
   if (e.pointerType === 'touch' && touchAiming) {
     touchAiming = false;
     handlePointerAim(e);
+    return;
+  }
+  if (mouseDragging) {
+    mouseDragging = false;
+    const power = shotPower;
+    setShotPower(0);
+    if (power >= 4 && canShoot()) fireCue(power);
   }
 });
 
-Canvas.addEventListener('pointercancel', () => { touchAiming = false; });
+Canvas.addEventListener('pointercancel', () => {
+  touchAiming = false;
+  mouseDragging = false;
+  setShotPower(0);
+});
 
 Canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// ---- Power meter: press + drag/pull to build power, release to fire. ----
-// Works identically for touch (finger drag) and mouse (click-drag-release)
-// via the Pointer Events API. Uses pointer capture so the drag keeps tracking
-// even if the finger/cursor strays outside the narrow track while pulling.
+// ---- Power meter (touch devices only — see the CSS media-feature rule
+// hiding it on mouse-driven devices): press + drag/pull to build power,
+// release to fire. Uses pointer capture so the drag keeps tracking even if
+// the finger strays outside the narrow track while pulling. ----
 const powerMeterTrack = document.getElementById('powerMeterTrack');
 const powerMeterFill = document.getElementById('powerMeterFill');
 const powerMeterHandle = document.getElementById('powerMeterHandle');
@@ -1517,6 +1704,74 @@ function releaseMeter(e) {
 
 powerMeterTrack.addEventListener('pointerup', releaseMeter);
 powerMeterTrack.addEventListener('pointercancel', () => { meterDragging = false; setShotPower(0); });
+
+// ---- Cue-ball spin selector: tapping the small cue-ball icon opens a
+// bigger overlay panel where the actual tuning happens (drag anywhere on
+// the enlarged ball). The dot is clamped to stay within the ball's circle;
+// its offset from center becomes spinX/spinY, read by the physics above.
+// Works the same on touch and mouse. ----
+const spinPad = document.getElementById('spinPad');
+const spinDot = document.getElementById('spinDot');
+const spinOverlay = document.getElementById('spinOverlay');
+const spinPadBig = document.getElementById('spinPadBig');
+const spinDotBig = document.getElementById('spinDotBig');
+const spinOverlayClose = document.getElementById('spinOverlayClose');
+let spinDragging = false;
+
+function setSpin(nx, ny) {
+  // Clamp to the unit circle so the dot never leaves the cue ball's face.
+  const mag = Math.hypot(nx, ny);
+  if (mag > 1) { nx /= mag; ny /= mag; }
+  spinX = nx;
+  spinY = ny;
+  spinDot.style.left = (50 + nx * 37) + '%';
+  spinDot.style.top = (50 + ny * 37) + '%';
+  spinDotBig.style.left = (50 + nx * 37) + '%';
+  spinDotBig.style.top = (50 + ny * 37) + '%';
+}
+
+function updateSpinFromEvent(padEl, e) {
+  const rect = padEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const nx = (e.clientX - cx) / (rect.width / 2);
+  const ny = (e.clientY - cy) / (rect.height / 2);
+  setSpin(nx, ny);
+}
+
+function openSpinOverlay() {
+  spinOverlay.classList.add('is-open');
+  spinOverlay.setAttribute('aria-hidden', 'false');
+}
+function closeSpinOverlay() {
+  spinOverlay.classList.remove('is-open');
+  spinOverlay.setAttribute('aria-hidden', 'true');
+}
+
+// Opens on a plain tap/click (not pointerdown) — pointerdown+preventDefault
+// was making this feel like it needed a long-press on some touch devices;
+// click is the standard, reliable "activate on tap" event for both touch
+// and mouse.
+spinPad.addEventListener('click', () => {
+  if (!canShoot()) return;
+  openSpinOverlay();
+});
+
+spinPadBig.addEventListener('pointerdown', (e) => {
+  spinDragging = true;
+  spinPadBig.setPointerCapture(e.pointerId);
+  updateSpinFromEvent(spinPadBig, e);
+  e.preventDefault();
+});
+spinPadBig.addEventListener('pointermove', (e) => {
+  if (!spinDragging) return;
+  updateSpinFromEvent(spinPadBig, e);
+});
+spinPadBig.addEventListener('pointerup', () => { spinDragging = false; });
+spinPadBig.addEventListener('pointercancel', () => { spinDragging = false; });
+
+spinOverlayClose.addEventListener('click', closeSpinOverlay);
+document.querySelector('#spinOverlay .spin-overlay-backdrop').addEventListener('click', closeSpinOverlay);
 
 // ---- Settings popover: collapses the opponent/difficulty/2P/rack buttons
 // behind a single gear icon so the dash normally just shows the score. ----
