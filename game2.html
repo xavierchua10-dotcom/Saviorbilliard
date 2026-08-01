@@ -78,7 +78,11 @@
     position: relative; width: 95%; max-width: 1000px; aspect-ratio: 2 / 1; background: #000; border-radius: 12px;
     box-shadow: 0 0 30px rgba(0,0,0,0.8), 0 0 1px 2px #2b3d6b; overflow: hidden; touch-action: none;
   }
-  canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+  canvas { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+
+  @media (max-width: 700px) and (orientation: portrait) {
+    .table-wrapper { width: min(95vw, 45vh); max-width: none; aspect-ratio: 1 / 2; }
+  }
 
   .controls-bar {
     width: 95%; max-width: 1000px; margin-top: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
@@ -100,10 +104,12 @@
   }
   .shoot-btn:active { transform: scale(0.96); }
 
-  @media (max-width: 600px) {
+  @media (max-width: 700px) {
     .dash { flex-direction: column; align-items: stretch; gap: 0.6rem; }
     .score-box { justify-content: space-between; }
-    .mode-controls { justify-content: center; }
+    .mode-controls { justify-content: center; flex-wrap: wrap; }
+    .controls-bar { flex-wrap: wrap; }
+    .shoot-btn { flex: 1; min-width: 120px; }
   }
 </style>
 </head>
@@ -240,21 +246,88 @@ const AudioEngine = (function(){
     return !isMuted;
   }
 
-  return { init, playClack, playPocket, startLofi, toggleSound };
+  // Bug fix: the button defaulted to showing "ON", but browsers block audio until a real
+  // user gesture, so nothing ever actually played — and the FIRST click on the button then
+  // silently muted audio that was never audible. This starts real playback on the first
+  // genuine interaction so the UI's default "ON" state is actually true.
+  function ensureStarted(){
+    init();
+    if(!isMuted) startLofi();
+  }
+
+  return { init, playClack, playPocket, startLofi, toggleSound, ensureStarted };
 })();
 
 const Canvas = document.getElementById('gameCanvas');
 const ctx = Canvas.getContext('2d');
 
+// TABLE is mutable: dimensions get recomputed on layout changes (mobile portrait <-> desktop landscape).
+// The long axis is always 900 "table units" and the short axis 400, regardless of which physical
+// screen axis (x or y) they map to — this keeps every ball/pocket/line position valid across orientations.
 const TABLE = { x: 50, y: 50, w: 900, h: 400, r: 12, friction: 0.985 };
-const POCKETS = [
-  { x: 50, y: 50, r: 22 },
-  { x: 500, y: 46, r: 20 },
-  { x: 950, y: 50, r: 22 },
-  { x: 50, y: 450, r: 22 },
-  { x: 500, y: 454, r: 20 },
-  { x: 950, y: 450, r: 22 }
-];
+
+let POCKETS = [];
+
+// longIsX: true when the table's long dimension (900 units) currently runs horizontally (desktop/landscape).
+// false when it runs vertically (mobile portrait) — i.e. the table is rotated 90°.
+function longIsX() { return TABLE.w >= TABLE.h; }
+
+// Converts abstract table coordinates (along the cue-to-triangle axis, across the centerline)
+// into real canvas x/y for whichever orientation is currently active.
+function P(along, across) {
+  if (longIsX()) return { x: TABLE.x + along, y: TABLE.y + TABLE.h / 2 + across };
+  return { x: TABLE.x + TABLE.w / 2 + across, y: TABLE.y + along };
+}
+
+// Inverse of P() — used to preserve ball positions when the orientation changes mid-game.
+function unP(x, y) {
+  if (longIsX()) return { along: x - TABLE.x, across: y - (TABLE.y + TABLE.h / 2) };
+  return { along: y - TABLE.y, across: x - (TABLE.x + TABLE.w / 2) };
+}
+
+function computePockets() {
+  const cx = TABLE.x + TABLE.w / 2, cy = TABLE.y + TABLE.h / 2;
+  if (longIsX()) {
+    return [
+      { x: TABLE.x, y: TABLE.y, r: 22 },
+      { x: cx, y: TABLE.y - 4, r: 20 },
+      { x: TABLE.x + TABLE.w, y: TABLE.y, r: 22 },
+      { x: TABLE.x, y: TABLE.y + TABLE.h, r: 22 },
+      { x: cx, y: TABLE.y + TABLE.h + 4, r: 20 },
+      { x: TABLE.x + TABLE.w, y: TABLE.y + TABLE.h, r: 22 }
+    ];
+  }
+  return [
+    { x: TABLE.x, y: TABLE.y, r: 22 },
+    { x: TABLE.x - 4, y: cy, r: 20 },
+    { x: TABLE.x, y: TABLE.y + TABLE.h, r: 22 },
+    { x: TABLE.x + TABLE.w, y: TABLE.y, r: 22 },
+    { x: TABLE.x + TABLE.w + 4, y: cy, r: 20 },
+    { x: TABLE.x + TABLE.w, y: TABLE.y + TABLE.h, r: 22 }
+  ];
+}
+
+const mqPortrait = window.matchMedia('(max-width: 700px) and (orientation: portrait)');
+
+function relayout() {
+  const snapshot = balls.map(b => ({ ball: b, ...unP(b.x, b.y) }));
+
+  const portrait = mqPortrait.matches;
+  const W = portrait ? 500 : 1000;
+  const H = portrait ? 1000 : 500;
+  Canvas.width = W;
+  Canvas.height = H;
+  TABLE.x = 50; TABLE.y = 50; TABLE.w = W - 100; TABLE.h = H - 100;
+
+  POCKETS = computePockets();
+
+  if (balls.length) {
+    snapshot.forEach(s => {
+      const p = P(s.along, s.across);
+      s.ball.x = p.x; s.ball.y = p.y;
+    });
+  }
+}
 
 const BALL_COLORS = {
   0: { color: '#ffffff', type: 'cue' },
@@ -400,32 +473,38 @@ let currentPlayer = 1;
 let playerGroups = { 1: null, 2: null };
 let isMoving = false;
 let isAiTurn = false;
+let gameOver = false;
 let pocketedThisTurn = [];
 
 let cueAnimOffset = 0;
 let isStriking = false;
 
 function setup8BallRack() {
+  relayout();
   balls = [];
-  cueBall = new Ball(0, 250, 250);
+
+  let p = P(200, 0);
+  cueBall = new Ball(0, p.x, p.y);
   balls.push(cueBall);
 
-  const startX = 680;
-  const startY = 250;
+  const startAlong = 630;
   const rackOrder = [1, 9, 2, 10, 8, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15];
   let idx = 0;
 
   for(let row=0; row<5; row++){
     for(let col=0; col<=row; col++){
-      const x = startX + row * (TABLE.r * 1.85);
-      const y = startY + (col - row/2) * (TABLE.r * 2.15);
-      balls.push(new Ball(rackOrder[idx], x, y));
+      const along = startAlong + row * (TABLE.r * 1.85);
+      const across = (col - row/2) * (TABLE.r * 2.15);
+      const pt = P(along, across);
+      balls.push(new Ball(rackOrder[idx], pt.x, pt.y));
       idx++;
     }
   }
 
+  POCKETS = computePockets();
   currentPlayer = 1;
   playerGroups = { 1: null, 2: null };
+  gameOver = false;
   updateUI();
   setStatus('BREAK THE RACK!');
 }
@@ -492,21 +571,28 @@ function processShotResults() {
   if(cuePotted) {
     setStatus('FOUL! Cue ball potted.');
     cueBall.inPocket = false;
-    cueBall.x = 250; cueBall.y = 250; cueBall.vx = 0; cueBall.vy = 0;
+    const p = P(200, 0);
+    cueBall.x = p.x; cueBall.y = p.y; cueBall.vx = 0; cueBall.vy = 0;
   }
 
   const eightPotted = pocketedThisTurn.some(b => b.num === 8);
   if(eightPotted) {
     const myGroup = playerGroups[currentPlayer];
-    const myGroupLeft = balls.some(b => !b.inPocket && b.info.type === myGroup);
+    // Bug fix: potting the 8-ball while the table is still open (no group assigned yet) is
+    // always a foul/loss for whoever potted it. The old check compared against a null group,
+    // which made `myGroupLeft` false and incorrectly declared the potter the winner.
+    const openTable = !myGroup;
+    const myGroupLeft = !openTable && balls.some(b => !b.inPocket && b.info.type === myGroup);
 
-    if(!myGroupLeft && !cuePotted) {
+    gameOver = true;
+    if(!openTable && !myGroupLeft && !cuePotted) {
       setStatus(`GAME OVER! PLAYER ${currentPlayer} WINS!`);
     } else {
       const winner = currentPlayer === 1 ? 2 : 1;
       setStatus(`GAME OVER! PLAYER ${winner} WINS (8-Ball Foul)!`);
     }
     pocketedThisTurn = [];
+    updateUI();
     return;
   }
 
@@ -540,7 +626,7 @@ function processShotResults() {
 }
 
 function triggerAiTurn() {
-  if(isMoving) return;
+  if(isMoving || gameOver) return;
   isAiTurn = true;
   setStatus('AI THINKING...');
 
@@ -559,7 +645,7 @@ function triggerAiTurn() {
 }
 
 function fireCue(powerPercent) {
-  if(isMoving || isStriking) return;
+  if(isMoving || isStriking || gameOver) return;
   isStriking = true;
   
   const power = (powerPercent / 100) * 22;
@@ -588,14 +674,17 @@ function render() {
   ctx.fillStyle = '#121f3d';
   ctx.fillRect(0, 0, Canvas.width, Canvas.height);
   ctx.fillStyle = '#2b3d6b';
-  ctx.fillRect(35, 35, 930, 430);
+  ctx.fillRect(35, 35, Canvas.width - 70, Canvas.height - 70);
 
   ctx.fillStyle = '#1a4d8c';
   ctx.fillRect(TABLE.x, TABLE.y, TABLE.w, TABLE.h);
 
+  // Head-string line — drawn perpendicular to whichever axis is currently the long axis,
+  // so this stays correct whether the table is landscape (desktop) or portrait (mobile).
+  const lineA = P(200, -200), lineB = P(200, 200);
   ctx.strokeStyle = 'rgba(255,255,255,0.2)';
   ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(250, TABLE.y); ctx.lineTo(250, TABLE.y + TABLE.h); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lineA.x, lineA.y); ctx.lineTo(lineB.x, lineB.y); ctx.stroke();
 
   POCKETS.forEach(p => {
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
@@ -643,23 +732,45 @@ function setStatus(msg) {
 }
 
 function handlePointerAim(e) {
-  if(isMoving || isAiTurn || isStriking) return;
+  if(isMoving || isAiTurn || isStriking || gameOver) return;
   const rect = Canvas.getBoundingClientRect();
   const mouseX = (e.clientX - rect.left) * (Canvas.width / rect.width);
   const mouseY = (e.clientY - rect.top) * (Canvas.height / rect.height);
   aimAngle = Math.atan2(mouseY - cueBall.y, mouseX - cueBall.x);
 }
 
-Canvas.addEventListener('pointermove', handlePointerAim);
+// Bug fix: on touch devices there's no hover, so the old code fired blind on the very first
+// tap (no chance to preview the shot). Touch now works like a slingshot: press+drag to aim,
+// lift to fire — mirroring how a mouse hovers to aim then clicks to fire.
+let touchAiming = false;
+
+Canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'touch' && !touchAiming) return;
+  handlePointerAim(e);
+});
 
 Canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch') {
+    touchAiming = true;
+    handlePointerAim(e);
+    e.preventDefault();
+    return;
+  }
   if (e.button === 0) {
     handlePointerAim(e);
-    if (!isMoving && !isAiTurn && !isStriking) {
-      fireCue(document.getElementById('powerSlider').value);
-    }
+    fireCue(document.getElementById('powerSlider').value);
   }
 });
+
+Canvas.addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'touch' && touchAiming) {
+    touchAiming = false;
+    handlePointerAim(e);
+    fireCue(document.getElementById('powerSlider').value);
+  }
+});
+
+Canvas.addEventListener('pointercancel', () => { touchAiming = false; });
 
 Canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -704,6 +815,17 @@ document.getElementById('soundBtn').addEventListener('click', () => {
   document.getElementById('soundBtn').classList.toggle('is-on', on);
   document.getElementById('soundBtn').textContent = on ? '🔊 LOFI SOUND' : '🔇 MUTED';
 });
+
+document.addEventListener('pointerdown', () => AudioEngine.ensureStarted(), { once: true });
+
+let resizeTimer = null;
+function handleViewportChange(){
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(relayout, 120);
+}
+mqPortrait.addEventListener('change', handleViewportChange);
+window.addEventListener('resize', handleViewportChange);
+window.addEventListener('orientationchange', handleViewportChange);
 
 setup8BallRack();
 render();
