@@ -81,8 +81,23 @@
   canvas { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
 
   @media (max-width: 700px) and (orientation: portrait) {
-    .table-wrapper { width: min(95vw, 45vh); max-width: none; aspect-ratio: 1 / 2; }
+    .table-wrapper { width: min(88vw, 36vh); max-width: none; aspect-ratio: 1 / 2; }
   }
+
+  /* AI Thinking overlay: centered over the table, hidden on the player's turn,
+     pulsing while the AI is "thinking". Uses visibility (not just opacity) so it
+     never intercepts pointer events even before the fade-out finishes. */
+  .ai-thinking-overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s ease; z-index: 5;
+  }
+  .ai-thinking-overlay.is-active { opacity: 1; visibility: visible; animation: aiThinkPulse 1.1s ease-in-out infinite; }
+  .ai-thinking-overlay .ai-thinking-text {
+    font-family: 'Orbitron', sans-serif; font-weight: 800; letter-spacing: 0.12em; text-align: center; white-space: nowrap;
+    font-size: clamp(0.8rem, 3.4vw, 1.5rem); color: var(--pink); text-shadow: 0 0 12px var(--pink), 0 0 22px var(--purple);
+    background: rgba(5, 1, 15, 0.6); border: 1px solid var(--pink); border-radius: 8px; padding: 0.55em 1.1em;
+  }
+  @keyframes aiThinkPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
   .controls-bar {
     width: 95%; max-width: 1000px; margin-top: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
@@ -146,6 +161,9 @@
 
   <div class="table-wrapper">
     <canvas id="gameCanvas" width="1000" height="500"></canvas>
+    <div id="aiThinkingOverlay" class="ai-thinking-overlay" aria-hidden="true">
+      <span class="ai-thinking-text">AI THINKING…</span>
+    </div>
   </div>
 
   <div class="controls-bar">
@@ -229,7 +247,7 @@ const AudioEngine = (function(){
         osc.type = 'sine';
         osc.frequency.value = freq;
         g.gain.setValueAtTime(0, now);
-        g.gain.linearRampToValueAtTime(0.03, now + 0.2);
+        g.gain.linearRampToValueAtTime(0.045, now + 0.2);
         g.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
         osc.connect(g);
         g.connect(master);
@@ -252,6 +270,10 @@ const AudioEngine = (function(){
   // genuine interaction so the UI's default "ON" state is actually true.
   function ensureStarted(){
     init();
+    // Some browsers (notably Safari/iOS) still create the AudioContext in a
+    // 'suspended' state even when init() runs inside a genuine user gesture —
+    // resume() here guarantees playback actually starts on that first tap.
+    if(ctx && ctx.state === 'suspended') ctx.resume();
     if(!isMuted) startLofi();
   }
 
@@ -283,6 +305,15 @@ function P(along, across) {
 function unP(x, y) {
   if (longIsX()) return { along: x - TABLE.x, across: y - (TABLE.y + TABLE.h / 2) };
   return { along: y - TABLE.y, across: x - (TABLE.x + TABLE.w / 2) };
+}
+
+// Clamps a canvas-space point to inside the playable felt (accounting for ball radius).
+// Used for ball-in-hand placement — in 8-ball, a foul lets you place the cue ball anywhere
+// on the table (not restricted to a "D" like snooker).
+function clampPointToTable(x, y) {
+  const minX = TABLE.x + TABLE.r, maxX = TABLE.x + TABLE.w - TABLE.r;
+  const minY = TABLE.y + TABLE.r, maxY = TABLE.y + TABLE.h - TABLE.r;
+  return { x: Math.min(Math.max(x, minX), maxX), y: Math.min(Math.max(y, minY), maxY) };
 }
 
 function computePockets() {
@@ -475,13 +506,24 @@ let isMoving = false;
 let isAiTurn = false;
 let gameOver = false;
 let pocketedThisTurn = [];
+let firstBallHit = null;
+
+// True after a foul: the incoming player must place the cue ball before they can aim & shoot.
+let ballInHand = false;
 
 let cueAnimOffset = 0;
 let isStriking = false;
 
+// True only for the opening stroke. Balls potted on the break do not assign groups —
+// the table stays open until someone pockets a ball on a later shot.
+let isBreakShot = true;
+
 function setup8BallRack() {
   relayout();
   balls = [];
+  ballInHand = false;
+  isAiTurn = false;
+  setAiThinkingVisible(false);
 
   let p = P(200, 0);
   cueBall = new Ball(0, p.x, p.y);
@@ -504,6 +546,7 @@ function setup8BallRack() {
   POCKETS = computePockets();
   currentPlayer = 1;
   playerGroups = { 1: null, 2: null };
+  isBreakShot = true;
   gameOver = false;
   updateUI();
   setStatus('BREAK THE RACK!');
@@ -519,6 +562,9 @@ function resolveCollisions() {
       const dist = Math.hypot(dx, dy);
 
       if(dist < TABLE.r * 2) {
+        if(!firstBallHit && b1 === cueBall) firstBallHit = b2;
+        if(!firstBallHit && b2 === cueBall) firstBallHit = b1;
+
         const angle = Math.atan2(dy, dx);
         const sin = Math.sin(angle), cos = Math.cos(angle);
 
@@ -566,26 +612,55 @@ function checkTurnEnd() {
 
 function processShotResults() {
   let switchTurn = true;
+  let foulOccurred = false;
   const cuePotted = cueBall.inPocket;
+  const wasBreakShot = isBreakShot;
+  isBreakShot = false;
 
   if(cuePotted) {
+    foulOccurred = true;
     setStatus('FOUL! Cue ball potted.');
     cueBall.inPocket = false;
     const p = P(200, 0);
     cueBall.x = p.x; cueBall.y = p.y; cueBall.vx = 0; cueBall.vy = 0;
   }
 
+  // Bug fix: the group-cleared test read the table AFTER the shot resolved. Pot your last
+  // solid legally and no solids remained, so the required first contact flipped to the
+  // 8-ball and your perfectly legal shot was scored as a foul. This reconstructs the
+  // pre-shot table by counting balls that went down on this very stroke as still up.
+  const pottedThisShot = new Set(pocketedThisTurn);
+  const groupWasOnTable = (g) => balls.some(b => b.info.type === g && (!b.inPocket || pottedThisShot.has(b)));
+
+  const myGroup = playerGroups[currentPlayer];
+  let wrongBallFoul = false;
+
+  // Bug fix: failing to contact any ball at all was not treated as a foul.
+  if(!firstBallHit) {
+    wrongBallFoul = true;
+    foulOccurred = true;
+    setStatus('FOUL! No ball contacted.');
+  } else if(myGroup) {
+    const expectedType = groupWasOnTable(myGroup) ? myGroup : 'eight';
+    if(firstBallHit.info.type !== expectedType) wrongBallFoul = true;
+  } else if(!wasBreakShot && firstBallHit.info.type === 'eight') {
+    // With the table open you may hit any numbered ball first, but never the 8.
+    wrongBallFoul = true;
+  }
+
+  if(wrongBallFoul && firstBallHit) {
+    foulOccurred = true;
+    setStatus('FOUL! Hit the wrong ball first.');
+  }
+
   const eightPotted = pocketedThisTurn.some(b => b.num === 8);
   if(eightPotted) {
-    const myGroup = playerGroups[currentPlayer];
-    // Bug fix: potting the 8-ball while the table is still open (no group assigned yet) is
-    // always a foul/loss for whoever potted it. The old check compared against a null group,
-    // which made `myGroupLeft` false and incorrectly declared the potter the winner.
+    // Potting the 8 while the table is still open, or alongside a scratch, loses the game.
     const openTable = !myGroup;
     const myGroupLeft = !openTable && balls.some(b => !b.inPocket && b.info.type === myGroup);
 
     gameOver = true;
-    if(!openTable && !myGroupLeft && !cuePotted) {
+    if(!openTable && !myGroupLeft && !cuePotted && !wrongBallFoul) {
       setStatus(`GAME OVER! PLAYER ${currentPlayer} WINS!`);
     } else {
       const winner = currentPlayer === 1 ? 2 : 1;
@@ -598,25 +673,50 @@ function processShotResults() {
 
   const validPotted = pocketedThisTurn.filter(b => b.num !== 0 && b.num !== 8);
 
-  if(validPotted.length > 0 && !cuePotted) {
-    if(!playerGroups[1]) {
-      const firstType = validPotted[0].info.type;
-      playerGroups[currentPlayer] = firstType;
-      playerGroups[currentPlayer === 1 ? 2 : 1] = firstType === 'solid' ? 'stripe' : 'solid';
-      setStatus(`TABLE ASSIGNED: PLAYER ${currentPlayer} IS ${firstType.toUpperCase()}S`);
+  if(validPotted.length > 0 && !cuePotted && !wrongBallFoul) {
+    // Bug fix: checked playerGroups[1] rather than the shooter's own group.
+    if(!playerGroups[currentPlayer]) {
+      const types = new Set(validPotted.map(b => b.info.type));
+      // Bug fix: any pot used to assign groups immediately, including on the break, and a
+      // mixed solid+stripe pot picked a group by array order. Neither assigns now.
+      if(wasBreakShot) {
+        setStatus('POTTED ON THE BREAK — TABLE STAYS OPEN.');
+      } else if(types.size > 1) {
+        setStatus('SOLID AND STRIPE POTTED — TABLE STAYS OPEN.');
+      } else {
+        const firstType = validPotted[0].info.type;
+        playerGroups[currentPlayer] = firstType;
+        playerGroups[currentPlayer === 1 ? 2 : 1] = firstType === 'solid' ? 'stripe' : 'solid';
+        setStatus(`TABLE ASSIGNED: PLAYER ${currentPlayer} IS ${firstType.toUpperCase()}S`);
+      }
       switchTurn = false;
     } else {
-      const myGroup = playerGroups[currentPlayer];
-      const pottedMine = validPotted.some(b => b.info.type === myGroup);
+      const pottedMine = validPotted.some(b => b.info.type === playerGroups[currentPlayer]);
       if(pottedMine) {
         switchTurn = false;
-        setStatus(`GREAT SHOT! CONTINUE TURN.`);
+        setStatus('GREAT SHOT! CONTINUE TURN.');
       }
     }
   }
 
   pocketedThisTurn = [];
+  firstBallHit = null;
   if(switchTurn) currentPlayer = currentPlayer === 1 ? 2 : 1;
+
+  // Ball-in-hand: after any foul, the incoming player may place the cue ball anywhere on
+  // the table (not restricted, unlike snooker's D).
+  if(foulOccurred) {
+    if(gameMode === 'VS_AI' && currentPlayer === 2) {
+      const rx = TABLE.x + TABLE.r + Math.random() * (TABLE.w - TABLE.r * 2);
+      const ry = TABLE.y + TABLE.r + Math.random() * (TABLE.h - TABLE.r * 2);
+      const settled = findValidCuePosition(rx, ry);
+      cueBall.x = settled.x; cueBall.y = settled.y; cueBall.vx = 0; cueBall.vy = 0;
+      ballInHand = false;
+    } else {
+      ballInHand = true;
+      setStatus('FOUL — drag the cue ball anywhere, then aim & fire.');
+    }
+  }
 
   updateUI();
 
@@ -629,11 +729,14 @@ function triggerAiTurn() {
   if(isMoving || gameOver) return;
   isAiTurn = true;
   setStatus('AI THINKING...');
+  setAiThinkingVisible(true);
 
   setTimeout(() => {
     const aiGroup = playerGroups[2];
     const targets = balls.filter(b => !b.inPocket && (aiGroup ? b.info.type === aiGroup : b.num !== 0 && b.num !== 8));
-    const target = targets[Math.floor(Math.random() * targets.length)] || balls.find(b => b.num === 8);
+    const target = targets[Math.floor(Math.random() * targets.length)]
+      || balls.find(b => b.num === 8 && !b.inPocket);
+    if(!target) return;
 
     let angle = Math.atan2(target.y - cueBall.y, target.x - cueBall.x);
     let error = (Math.random() - 0.5) * (aiDifficulty === 'EASY' ? 0.35 : aiDifficulty === 'MED' ? 0.15 : 0.04);
@@ -641,11 +744,12 @@ function triggerAiTurn() {
     aimAngle = angle + error;
     fireCue(40 + Math.random() * 40);
     isAiTurn = false;
+    setAiThinkingVisible(false);
   }, 1000);
 }
 
 function fireCue(powerPercent) {
-  if(isMoving || isStriking || gameOver) return;
+  if(isMoving || isStriking || gameOver || ballInHand) return;
   isStriking = true;
   
   const power = (powerPercent / 100) * 22;
@@ -662,13 +766,33 @@ function fireCue(powerPercent) {
       cueBall.vx = Math.cos(aimAngle) * power;
       cueBall.vy = Math.sin(aimAngle) * power;
       isMoving = true;
+      firstBallHit = null;
       pocketedThisTurn = [];
       AudioEngine.playClack(power / 10);
     }
   }, 16);
 }
 
-function render() {
+// Bug fix: physics used to advance exactly one step per animation frame, so on a 120Hz
+// phone every ball travelled twice as fast and friction decayed twice as quickly as on a
+// 60Hz screen. A fixed accumulator keeps the table identical on every display.
+const PHYSICS_STEP_MS = 1000 / 60;
+let lastFrameTime = 0;
+let physicsAccumulator = 0;
+
+function stepPhysics() {
+  balls.forEach(b => b.update());
+  resolveCollisions();
+  checkPockets();
+}
+
+function render(timestamp) {
+  if (typeof timestamp !== 'number') timestamp = performance.now();
+  if (!lastFrameTime) lastFrameTime = timestamp;
+  // Cap the delta so a backgrounded tab doesn't fast-forward the whole shot on return.
+  physicsAccumulator += Math.min(timestamp - lastFrameTime, 100);
+  lastFrameTime = timestamp;
+
   ctx.clearRect(0, 0, Canvas.width, Canvas.height);
 
   ctx.fillStyle = '#121f3d';
@@ -692,7 +816,18 @@ function render() {
     ctx.strokeStyle = '#1e2b4a'; ctx.lineWidth = 3; ctx.stroke();
   });
 
-  if(!isMoving && !cueBall.inPocket) {
+  if(ballInHand && !cueBall.inPocket) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(35, 232, 255, 0.85)';
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cueBall.x, cueBall.y, TABLE.r + 8, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if(!isMoving && !cueBall.inPocket && !ballInHand) {
     const powerVal = parseInt(document.getElementById('powerSlider').value);
     const baseDistance = isStriking ? cueAnimOffset : 15 + (powerVal / 100) * 35;
 
@@ -710,9 +845,14 @@ function render() {
     ctx.restore();
   }
 
-  balls.forEach(b => b.update());
-  resolveCollisions();
-  checkPockets();
+  let steps = 0;
+  while (physicsAccumulator >= PHYSICS_STEP_MS && steps < 8) {
+    stepPhysics();
+    physicsAccumulator -= PHYSICS_STEP_MS;
+    steps++;
+  }
+  if (physicsAccumulator > PHYSICS_STEP_MS * 8) physicsAccumulator = 0;
+
   balls.forEach(b => b.draw());
   checkTurnEnd();
 
@@ -731,6 +871,13 @@ function setStatus(msg) {
   document.getElementById('statusText').textContent = msg;
 }
 
+// Shows/hides the centered "AI THINKING" overlay on the table. Kept as its own
+// call (rather than folded into isAiTurn assignments) so it stays in sync even
+// if isAiTurn is ever set from a new code path later.
+function setAiThinkingVisible(visible) {
+  document.getElementById('aiThinkingOverlay').classList.toggle('is-active', visible);
+}
+
 function handlePointerAim(e) {
   if(isMoving || isAiTurn || isStriking || gameOver) return;
   const rect = Canvas.getBoundingClientRect();
@@ -739,17 +886,71 @@ function handlePointerAim(e) {
   aimAngle = Math.atan2(mouseY - cueBall.y, mouseX - cueBall.x);
 }
 
+// Ball-in-hand: lets the player drag the cue ball anywhere on the table before shooting.
+function getCanvasXY(e) {
+  const rect = Canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (Canvas.width / rect.width),
+    y: (e.clientY - rect.top) * (Canvas.height / rect.height)
+  };
+}
+
+// Finds a valid cue-ball position near (desiredX, desiredY): inside the table, and not
+// overlapping any other ball. Tries the clamped point first, then spirals outward in
+// rings, re-clamping each candidate into the table, until a clear spot is found. This is
+// guaranteed to terminate correctly even deep inside a tightly packed cluster of balls
+// (e.g. dragging straight onto the 8-ball at the center of the rack) — an iterative
+// "push away" approach can get stuck oscillating between neighbors there.
+function findValidCuePosition(desiredX, desiredY) {
+  const minDist = TABLE.r * 2 + 0.5;
+  const overlapsAny = (x, y) => balls.some(b => b !== cueBall && !b.inPocket && Math.hypot(x - b.x, y - b.y) < minDist);
+
+  const first = clampPointToTable(desiredX, desiredY);
+  if (!overlapsAny(first.x, first.y)) return first;
+
+  const step = TABLE.r;
+  const maxRadius = Math.max(TABLE.w, TABLE.h) + step;
+  for (let radius = step; radius <= maxRadius; radius += step) {
+    const angleSteps = Math.max(8, Math.round((2 * Math.PI * radius) / (TABLE.r * 1.2)));
+    for (let i = 0; i < angleSteps; i++) {
+      const angle = (i / angleSteps) * Math.PI * 2;
+      const candidate = clampPointToTable(desiredX + Math.cos(angle) * radius, desiredY + Math.sin(angle) * radius);
+      if (!overlapsAny(candidate.x, candidate.y)) return candidate;
+    }
+  }
+  return first; // shouldn't happen — the table can't realistically be fully packed
+}
+
+function handleBallPlacement(e) {
+  if(isMoving || isAiTurn || isStriking || gameOver) return;
+  const { x, y } = getCanvasXY(e);
+  const settled = findValidCuePosition(x, y);
+  cueBall.x = settled.x; cueBall.y = settled.y;
+  cueBall.vx = 0; cueBall.vy = 0;
+}
+
 // Bug fix: on touch devices there's no hover, so the old code fired blind on the very first
 // tap (no chance to preview the shot). Touch now works like a slingshot: press+drag to aim,
 // lift to fire — mirroring how a mouse hovers to aim then clicks to fire.
 let touchAiming = false;
 
 Canvas.addEventListener('pointermove', (e) => {
+  if (ballInHand) {
+    if (e.pointerType === 'touch' && !touchAiming) return;
+    handleBallPlacement(e);
+    return;
+  }
   if (e.pointerType === 'touch' && !touchAiming) return;
   handlePointerAim(e);
 });
 
 Canvas.addEventListener('pointerdown', (e) => {
+  if (ballInHand) {
+    touchAiming = true;
+    handleBallPlacement(e);
+    e.preventDefault();
+    return;
+  }
   if (e.pointerType === 'touch') {
     touchAiming = true;
     handlePointerAim(e);
@@ -763,6 +964,13 @@ Canvas.addEventListener('pointerdown', (e) => {
 });
 
 Canvas.addEventListener('pointerup', (e) => {
+  if (ballInHand) {
+    touchAiming = false;
+    handleBallPlacement(e);
+    ballInHand = false;
+    setStatus('CUE BALL PLACED — AIM & FIRE');
+    return;
+  }
   if (e.pointerType === 'touch' && touchAiming) {
     touchAiming = false;
     handlePointerAim(e);
@@ -779,7 +987,7 @@ document.getElementById('powerSlider').addEventListener('input', (e) => {
 });
 
 document.getElementById('shootBtn').addEventListener('click', () => {
-  if(isMoving || isAiTurn || isStriking) return;
+  if(isMoving || isAiTurn || isStriking || ballInHand) return;
   fireCue(document.getElementById('powerSlider').value);
 });
 
