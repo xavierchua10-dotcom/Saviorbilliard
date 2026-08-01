@@ -292,6 +292,23 @@
     height:100%;
     padding:1.9rem 1.6rem 1.6rem;
     display:flex; flex-direction:column; align-items:flex-start; gap:.6rem;
+    background-size:cover;
+    background-position:center;
+  }
+
+  /* ---------- column background photos (linked files, not embedded) ---------- */
+  /* Upload snooker-bg.png and pool-bg.png alongside this HTML file on GitHub. */
+
+  #game1Container .table-card__inner{
+    background-image:
+      linear-gradient(165deg, rgba(16,4,38,.82), rgba(28,6,58,.86)),
+      url("snooker-bg.png");
+  }
+
+  #game2Container .table-card__inner{
+    background-image:
+      linear-gradient(165deg, rgba(16,4,38,.82), rgba(28,6,58,.86)),
+      url("pool-bg.png");
   }
 
   .table-card__head{
@@ -336,34 +353,6 @@
     line-height:1.4;
     color:var(--text-muted);
     font-weight:500;
-  }
-
-  /* ---------- table stage (game placeholder) ---------- */
-
-  .stage{
-    position:relative;
-    width:100%;
-    aspect-ratio:2 / 1;
-    border-radius:14px;
-    overflow:hidden;
-    box-shadow:
-      inset 0 0 0 10px var(--cushion),
-      inset 0 0 0 12px rgba(0,0,0,.45),
-      0 0 24px rgba(0,0,0,.5);
-    background-image:
-      radial-gradient(circle 16px at 4% 6%, rgba(0,0,0,.85) 60%, transparent 62%),
-      radial-gradient(circle 16px at 96% 6%, rgba(0,0,0,.85) 60%, transparent 62%),
-      radial-gradient(circle 14px at 50% 4%, rgba(0,0,0,.8) 60%, transparent 62%),
-      radial-gradient(circle 16px at 4% 94%, rgba(0,0,0,.85) 60%, transparent 62%),
-      radial-gradient(circle 16px at 96% 94%, rgba(0,0,0,.85) 60%, transparent 62%),
-      radial-gradient(circle 14px at 50% 96%, rgba(0,0,0,.8) 60%, transparent 62%),
-      radial-gradient(ellipse at 50% 48%, var(--felt-a) 0%, var(--felt-b) 58%, var(--felt-c) 100%);
-  }
-
-  .stage canvas{
-    position:absolute; inset:0;
-    width:100%; height:100%;
-    display:block;
   }
 
   .play-btn{
@@ -743,9 +732,6 @@
             </div>
           </div>
           <p>Reds, colors, and a baize that doesn't forgive. Precision play only.</p>
-          <div class="stage">
-            <canvas id="game1Canvas" width="800" height="400" aria-label="Snooker table"></canvas>
-          </div>
           <a class="play-btn" href="game1.html">PLAY <span class="arrow">➤</span></a>
         </div>
       </article>
@@ -767,9 +753,6 @@
             </div>
           </div>
           <p>Call it, pot it, run the table. Classic bar-room 8-ball.</p>
-          <div class="stage">
-            <canvas id="game2Canvas" width="800" height="400" aria-label="8-Ball pool table"></canvas>
-          </div>
           <a class="play-btn" href="game2.html">PLAY <span class="arrow">➤</span></a>
         </div>
       </article>
